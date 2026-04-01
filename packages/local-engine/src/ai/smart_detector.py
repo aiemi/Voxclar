@@ -17,15 +17,28 @@ from src.ai.question_detector import LocalQuestionDetector
 
 logger = logging.getLogger(__name__)
 
-LLM_DETECT_PROMPT = """You see a live interview transcript, line by line. The last line is the newest.
-Decide: has the interviewer FINISHED asking something the candidate should respond to?
+LLM_DETECT_PROMPT = """You are inside a live interview. You see the interviewer's speech in real-time, line by line.
 
-yes = the interviewer just completed a question/request/prompt (direct or implicit). The candidate should answer NOW.
-no = the interviewer is still talking (mid-sentence, continuing a thought), or said something that doesn't need a response.
+Your job: decide if the interviewer has FINISHED speaking and it's the candidate's turn to respond.
 
-Key: only say "yes" when the interviewer has FINISHED their point and is waiting for the candidate to speak.
+Say YES when:
+- Interviewer asked a question (with or without ?)
+- Interviewer said "tell me about...", "walk me through...", "describe..."
+- Interviewer finished a long statement and is clearly waiting for a response
+- Interviewer made a comment that implies the candidate should elaborate
+- Interviewer stopped talking after making a point (the [LATEST] line feels like an ending)
 
-Reply ONLY: yes/no,type (technical/behavioral/general)"""
+Say NO when:
+- Interviewer is clearly mid-sentence (the [LATEST] line is incomplete)
+- Interviewer is still building up to their point
+
+In interviews, when someone finishes a substantial statement, they usually expect a response.
+
+Reply with EXACTLY one word then a comma then one word. Example responses:
+yes,behavioral
+yes,technical
+yes,general
+no,none"""
 
 
 class SmartQuestionDetector:
@@ -74,12 +87,15 @@ class SmartQuestionDetector:
             )
             answer = (resp.choices[0].message.content or "").strip().lower()
 
-            # 解析 "yes,behavioral" 或 "no,general"
-            parts = answer.split(",")
-            is_question = parts[0].strip().startswith("yes")
-            q_type = parts[1].strip() if len(parts) > 1 else "general"
-            if q_type not in ("technical", "behavioral", "general"):
-                q_type = "general"
+            # 健壮解析 — 只看开头是 yes 还是 no
+            is_question = answer.startswith("yes")
+
+            # 提取类型
+            q_type = "general"
+            if "technical" in answer:
+                q_type = "technical"
+            elif "behavioral" in answer:
+                q_type = "behavioral"
 
             logger.info(f"[Detect] LLM: '{answer}' → is_question={is_question}, type={q_type}")
             return {
