@@ -61,7 +61,8 @@ class MeetingEngine:
         self._meeting_start_time = 0.0
         self._recent_system_text = ""
         self._last_system_final_time = 0.0
-        self._CONTEXT_WINDOW = 8.0
+        self._CONTEXT_WINDOW = 4.0    # 4秒静默 = 一段话说完了
+        self._MAX_ACCUMULATE = 300    # 超过 300 字符立即触发回答
 
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
@@ -155,6 +156,11 @@ class MeetingEngine:
     def stop_meeting(self):
         if not self.is_running:
             return
+
+        # Flush 残留的累积文本
+        if self._recent_system_text and len(self._recent_system_text) > 30:
+            self._trigger_answer(self._recent_system_text)
+
         self.is_running = False
         if self._capture:
             self._capture.stop()
@@ -163,7 +169,6 @@ class MeetingEngine:
                 asyncio.run_coroutine_threadsafe(self._system_deepgram.disconnect(), self._loop)
             if self._mic_deepgram:
                 asyncio.run_coroutine_threadsafe(self._mic_deepgram.disconnect(), self._loop)
-            # 会议结束 → 浓缩并保存记忆
             asyncio.run_coroutine_threadsafe(self._save_meeting_memory(), self._loop)
         self._recent_system_text = ""
         logger.info("Meeting stopped")
@@ -336,7 +341,7 @@ class MeetingEngine:
     # ═══════════════════════════════════════════════════════════════════
 
     def _on_system_transcript(self, result: dict):
-        """系统音频转写 → 字幕 + 问题检测。"""
+        """系统音频转写 → 字幕 + 智能回答触发。"""
         text = result.get("text", "")
         is_final = result.get("is_final", False)
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
@@ -351,37 +356,62 @@ class MeetingEngine:
                 "speaker": "other",
             })
 
-        # 问题检测
-        if is_final and self._question_detector:
-            now = time.time()
-            if now - self._last_system_final_time < self._CONTEXT_WINDOW:
-                self._recent_system_text = (self._recent_system_text + " " + text).strip()
-            else:
-                self._recent_system_text = text
-            self._last_system_final_time = now
+        if not is_final:
+            return
 
-            qr = self._question_detector.detect(self._recent_system_text, self._context.language)
-            if qr["is_question"]:
-                question = self._recent_system_text
+        # 累积对方说的 final 文本
+        now = time.time()
+        if now - self._last_system_final_time < self._CONTEXT_WINDOW:
+            self._recent_system_text = (self._recent_system_text + " " + text).strip()
+        else:
+            # 静默超过阈值 → 之前的段落结束，触发回答
+            if self._recent_system_text and len(self._recent_system_text) > 30:
+                self._trigger_answer(self._recent_system_text)
+            self._recent_system_text = text
+        self._last_system_final_time = now
 
-                # 记录到上下文
-                self._context.add_question(question, qr["question_type"])
+        # 累积文本超长 → 立即触发（不等静默）
+        if len(self._recent_system_text) >= self._MAX_ACCUMULATE:
+            self._trigger_answer(self._recent_system_text)
+            self._recent_system_text = ""
 
-                if self.on_question_detected:
-                    self.on_question_detected({
-                        "type": "question_detected",
-                        "question": question,
-                        "question_type": qr["question_type"],
-                        "confidence": qr["confidence"],
-                    })
+        logger.info(f"[Transcript] final: '{text[:60]}' | buffer: {len(self._recent_system_text)} chars")
 
-                # 生成 AI 回答
-                if self._loop:
-                    self._loop.call_soon_threadsafe(
-                        asyncio.ensure_future,
-                        self._generate_answer(question, qr["question_type"]),
-                    )
-                self._recent_system_text = ""
+    def _trigger_answer(self, text: str):
+        """对方说完一段话 → 检测类型 → 生成 AI 回答。
+
+        面试场景下，对方的每一段完整发言都可能需要回应，
+        不仅仅是明确的问句。
+        """
+        # 用问题检测器判断类型（但不用它来决定是否回答）
+        question_type = "general"
+        if self._question_detector:
+            qr = self._question_detector.detect(text, self._context.language)
+            question_type = qr.get("question_type", "general")
+            logger.info(
+                f"Answer triggered: is_question={qr['is_question']}, "
+                f"type={question_type}, confidence={qr.get('confidence', 0):.2f}, "
+                f"text='{text[:80]}...'"
+            )
+
+        # 记录到上下文
+        self._context.add_question(text, question_type)
+
+        if self.on_question_detected:
+            self.on_question_detected({
+                "type": "question_detected",
+                "question": text,
+                "question_type": question_type,
+                "confidence": 1.0,
+            })
+
+        # 生成 AI 回答
+        if self._loop:
+            self._loop.call_soon_threadsafe(
+                asyncio.ensure_future,
+                self._generate_answer(text, question_type),
+            )
+        self._recent_system_text = ""
 
     def _on_mic_transcript(self, result: dict):
         """麦克风转写 → 存入上下文（用户自己说的话）。"""
