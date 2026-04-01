@@ -24,6 +24,14 @@ export default function CaptionOverlay() {
     if (!electronAPI) return
     const cleanup = electronAPI.caption.onData((raw) => {
       const data = raw as CaptionData
+      // 清空信号
+      if (data.transcript === null && data.answer === null) {
+        setConfirmed('')
+        setPending('')
+        setAnswer(null)
+        return
+      }
+
       if (data.transcript) {
         if (data.transcript.is_final) {
           setConfirmed((prev) => {

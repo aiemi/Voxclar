@@ -123,6 +123,9 @@ export function useEngine() {
   }, [])
 
   const startMeeting = useCallback((config: MeetingConfig) => {
+    // 清空字幕窗口上一次会议的内容
+    electronAPI?.caption.update({ transcript: null, answer: null })
+
     // 加载 profile context
     let profileContext = ''
     try {
