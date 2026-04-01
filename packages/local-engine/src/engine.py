@@ -16,7 +16,7 @@ from src.audio.capture_manager import DualAudioCaptureManager
 from src.audio.noise_reducer import AdaptiveNoiseReducer
 from src.audio.echo_canceller import EchoCanceller
 from src.asr.deepgram_stream import DeepgramStream
-from src.ai.question_detector import LocalQuestionDetector
+from src.ai.smart_detector import SmartQuestionDetector
 from src.ai.answer_generator import generate_answer
 from src.ai.meeting_context import MeetingContext
 from src.ai.document_summarizer import summarize_document
@@ -97,8 +97,8 @@ class MeetingEngine:
         self._noise_reducer = AdaptiveNoiseReducer()
         self._echo_canceller = EchoCanceller()
 
-        # 问题检测
-        self._question_detector = LocalQuestionDetector(default_language=language)
+        # 智能问题检测（规则 + LLM）
+        self._detector = SmartQuestionDetector(default_language=language)
 
         # Deepgram
         self._system_deepgram = DeepgramStream(
@@ -159,7 +159,7 @@ class MeetingEngine:
 
         # Flush 残留的累积文本
         if self._recent_system_text and len(self._recent_system_text) > 30:
-            self._trigger_answer(self._recent_system_text)
+            self._trigger_detect(self._recent_system_text)
 
         self.is_running = False
         if self._capture:
@@ -366,35 +366,48 @@ class MeetingEngine:
         else:
             # 静默超过阈值 → 之前的段落结束，触发回答
             if self._recent_system_text and len(self._recent_system_text) > 30:
-                self._trigger_answer(self._recent_system_text)
+                self._trigger_detect(self._recent_system_text)
             self._recent_system_text = text
         self._last_system_final_time = now
 
         # 累积文本超长 → 立即触发（不等静默）
         if len(self._recent_system_text) >= self._MAX_ACCUMULATE:
-            self._trigger_answer(self._recent_system_text)
+            self._trigger_detect(self._recent_system_text)
             self._recent_system_text = ""
 
         logger.info(f"[Transcript] final: '{text[:60]}' | buffer: {len(self._recent_system_text)} chars")
 
-    def _trigger_answer(self, text: str):
-        """对方说完一段话 → 检测类型 → 生成 AI 回答。
+    def _trigger_detect(self, text: str):
+        """对方说完一段话 → 规则快筛 → 需要时 LLM 深度判断 → 确认是问题才回答。"""
+        if not self._detector:
+            return
 
-        面试场景下，对方的每一段完整发言都可能需要回应，
-        不仅仅是明确的问句。
-        """
-        # 用问题检测器判断类型（但不用它来决定是否回答）
-        question_type = "general"
-        if self._question_detector:
-            qr = self._question_detector.detect(text, self._context.language)
-            question_type = qr.get("question_type", "general")
-            logger.info(
-                f"Answer triggered: is_question={qr['is_question']}, "
-                f"type={question_type}, confidence={qr.get('confidence', 0):.2f}, "
-                f"text='{text[:80]}...'"
-            )
+        # 1. 规则快筛（零延迟）
+        fast = self._detector.detect_fast(text, self._context.language)
 
-        # 记录到上下文
+        if fast["is_question"]:
+            # 规则高置信命中 → 直接回答
+            self._fire_answer(text, fast["question_type"])
+        elif fast.get("needs_llm"):
+            # 规则没命中 → 交给 LLM 判断（异步，~100ms）
+            if self._loop:
+                self._loop.call_soon_threadsafe(
+                    asyncio.ensure_future,
+                    self._llm_detect_and_answer(text),
+                )
+
+    async def _llm_detect_and_answer(self, text: str):
+        """LLM 深度判断是否是问题，是的话生成回答。"""
+        result = await self._detector.detect_with_llm(text)
+        if result["is_question"]:
+            self._fire_answer(text, result["question_type"])
+        else:
+            logger.info(f"[Detect] Not a question: '{text[:60]}...'")
+
+    def _fire_answer(self, text: str, question_type: str):
+        """确认是问题 → 通知前端 + 生成 AI 回答。"""
+        logger.info(f"[Answer] Generating: type={question_type}, text='{text[:60]}...'")
+
         self._context.add_question(text, question_type)
 
         if self.on_question_detected:
@@ -405,7 +418,6 @@ class MeetingEngine:
                 "confidence": 1.0,
             })
 
-        # 生成 AI 回答
         if self._loop:
             self._loop.call_soon_threadsafe(
                 asyncio.ensure_future,
