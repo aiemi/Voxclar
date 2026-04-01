@@ -60,7 +60,8 @@ class MeetingEngine:
         self._meeting_title = ""
         self._meeting_start_time = 0.0
         self._recent_system_text = ""
-        self._last_checked_text = ""        # 避免重复检测
+        self._last_checked_text = ""
+        self._pending_detect: asyncio.Task | None = None
 
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
@@ -171,6 +172,8 @@ class MeetingEngine:
             asyncio.run_coroutine_threadsafe(self._save_meeting_memory(), self._loop)
         self._recent_system_text = ""
         self._last_checked_text = ""
+        if self._pending_detect and not self._pending_detect.done():
+            self._pending_detect.cancel()
         logger.info("Meeting stopped")
 
     async def _save_meeting_memory(self):
@@ -341,7 +344,7 @@ class MeetingEngine:
     # ═══════════════════════════════════════════════════════════════════
 
     def _on_system_transcript(self, result: dict):
-        """系统音频转写 → 字幕 + 累积文本（不检测，等 UtteranceEnd）。"""
+        """系统音频转写 → 字幕 + 累积 + 延迟检测。"""
         text = result.get("text", "")
         is_final = result.get("is_final", False)
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
@@ -359,23 +362,36 @@ class MeetingEngine:
         if not is_final or len(text.strip()) < 5:
             return
 
-        # 只累积，不检测 — 等 Deepgram UtteranceEnd 信号
+        # 累积
         self._recent_system_text = (self._recent_system_text + " " + text).strip()
         logger.info(f"[Transcript] final: '{text[:50]}' | total: {len(self._recent_system_text)} chars")
 
-    def _on_utterance_end(self):
-        """Deepgram 判断对方说完了一段话 → 用 LLM 检测是否需要回应。"""
-        text = self._recent_system_text.strip()
-        if not text or len(text) < 20:
-            return
+        # 取消之前的待检测任务，重新计时3秒
+        if self._pending_detect and not self._pending_detect.done():
+            self._pending_detect.cancel()
+        if self._loop:
+            self._pending_detect = asyncio.ensure_future(self._delayed_detect())
 
-        # 避免重复检测同一段文本
-        if text == self._last_checked_text:
+    async def _delayed_detect(self):
+        """等3秒没有新 final → 对方说完了 → 检测。"""
+        await asyncio.sleep(3.0)
+        text = self._recent_system_text.strip()
+        if not text or len(text) < 20 or text == self._last_checked_text:
             return
         self._last_checked_text = text
+        logger.info(f"[Detect] Speaker stopped. Checking {len(text)} chars: '{text[:80]}...'")
+        await self._detect_and_answer(text)
 
+    def _on_utterance_end(self):
+        """Deepgram UtteranceEnd（如果收到就立即检测，不等计时器）。"""
+        text = self._recent_system_text.strip()
+        if not text or len(text) < 20 or text == self._last_checked_text:
+            return
+        self._last_checked_text = text
+        # 取消延迟检测，直接检测
+        if self._pending_detect and not self._pending_detect.done():
+            self._pending_detect.cancel()
         logger.info(f"[UtteranceEnd] Checking {len(text)} chars: '{text[:80]}...'")
-
         if self._loop:
             asyncio.ensure_future(self._detect_and_answer(text))
 
