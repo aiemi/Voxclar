@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Meeting, Transcript, Answer } from '@/types'
+import type { Meeting, Transcript, Answer, MeetingRecord } from '@/types'
 
 /**
  * 双轨累积：system(other) 和 mic(user) 各自独立累积文本。
@@ -8,12 +8,15 @@ import type { Meeting, Transcript, Answer } from '@/types'
  * 两个轨道不互相干扰。
  */
 
+const RECORDS_KEY = 'voxclar_meeting_records'
+
 interface MeetingState {
   activeMeeting: Meeting | null
   transcripts: Transcript[]
   answers: Answer[]
   isRecording: boolean
   elapsedSeconds: number
+  lastRecord: MeetingRecord | null  // 刚结束的会议记录
 
   startMeeting: (meeting: Meeting) => void
   stopMeeting: () => void
@@ -22,7 +25,28 @@ interface MeetingState {
   addAnswer: (a: Answer) => void
   appendAnswerToken: (token: string) => void
   setElapsed: (s: number) => void
+  setLastRecordSummary: (summary: string) => void
   reset: () => void
+}
+
+/** 保存会议记录到 localStorage */
+function saveRecord(record: MeetingRecord) {
+  try {
+    const raw = localStorage.getItem(RECORDS_KEY)
+    const records: MeetingRecord[] = raw ? JSON.parse(raw) : []
+    records.unshift(record)
+    // 保留最近 50 条
+    if (records.length > 50) records.length = 50
+    localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
+  } catch {}
+}
+
+/** 读取历史会议记录 */
+export function loadRecords(): MeetingRecord[] {
+  try {
+    const raw = localStorage.getItem(RECORDS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
 }
 
 // 每个 speaker 轨道的累积状态
@@ -38,11 +62,12 @@ function resetTracks() {
   delete tracks['user']
 }
 
-export const useMeetingStore = create<MeetingState>((set) => ({
+export const useMeetingStore = create<MeetingState>((set, get) => ({
   activeMeeting: null,
   transcripts: [],
   answers: [],
   isRecording: false,
+  lastRecord: null,
   elapsedSeconds: 0,
 
   startMeeting: (meeting) => {
@@ -50,7 +75,25 @@ export const useMeetingStore = create<MeetingState>((set) => ({
     set({ activeMeeting: meeting, transcripts: [], answers: [], isRecording: true, elapsedSeconds: 0 })
   },
 
-  stopMeeting: () => set({ isRecording: false }),
+  stopMeeting: () => {
+    const { activeMeeting, transcripts, answers, elapsedSeconds } = get()
+    if (activeMeeting) {
+      const record: MeetingRecord = {
+        meeting: {
+          ...activeMeeting,
+          status: 'completed',
+          duration_seconds: elapsedSeconds,
+          ended_at: new Date().toISOString(),
+        },
+        transcripts: [...transcripts],
+        answers: [...answers],
+      }
+      saveRecord(record)
+      set({ isRecording: false, lastRecord: record })
+    } else {
+      set({ isRecording: false })
+    }
+  },
 
   addTranscript: (t) => set((state) => ({ transcripts: [...state.transcripts, t] })),
 
@@ -132,6 +175,21 @@ export const useMeetingStore = create<MeetingState>((set) => ({
     }),
 
   setElapsed: (s) => set({ elapsedSeconds: s }),
+
+  setLastRecordSummary: (summary) => set((state) => {
+    if (!state.lastRecord) return state
+    const updated = { ...state.lastRecord, summary, summaryGenerating: false }
+    // 同步更新 localStorage
+    try {
+      const raw = localStorage.getItem(RECORDS_KEY)
+      const records: MeetingRecord[] = raw ? JSON.parse(raw) : []
+      if (records[0]?.meeting.id === updated.meeting.id) {
+        records[0] = updated
+        localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
+      }
+    } catch {}
+    return { lastRecord: updated }
+  }),
 
   reset: () => {
     resetTracks()

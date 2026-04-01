@@ -7,8 +7,9 @@
  * 3. 自动启动 Python 本地引擎
  * 4. macOS 原生集成（交通灯按钮、dock 菜单）
  */
-import { app, BrowserWindow, ipcMain, screen, systemPreferences, nativeImage } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, systemPreferences, nativeImage, dialog } from 'electron'
 import { spawn, ChildProcess } from 'child_process'
+import { writeFile } from 'fs/promises'
 import path from 'path'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
@@ -223,6 +224,28 @@ ipcMain.handle('caption:setOpacity', (_event, opacity: number) => {
   if (captionWindow) {
     captionWindow.setOpacity(Math.max(0.1, Math.min(1, opacity)))
   }
+})
+
+// PDF 导出 — 用隐藏窗口渲染 HTML 生成品牌化 PDF
+ipcMain.handle('export:savePDF', async (_event, html: string, filename: string) => {
+  const { filePath } = await dialog.showSaveDialog({
+    defaultPath: filename,
+    filters: [{ name: 'PDF', extensions: ['pdf'] }],
+  })
+  if (!filePath) return null
+
+  // 创建隐藏窗口渲染 HTML
+  const printWin = new BrowserWindow({ show: false, width: 800, height: 1100 })
+  await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+
+  const pdfBuffer = await printWin.webContents.printToPDF({
+    printBackground: true,
+    margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 },
+    pageSize: 'A4',
+  })
+  await writeFile(filePath, pdfBuffer)
+  printWin.close()
+  return filePath
 })
 
 // 获取屏幕共享保护状态

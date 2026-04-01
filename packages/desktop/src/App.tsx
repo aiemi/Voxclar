@@ -10,6 +10,7 @@ import Meeting from '@/pages/Meeting'
 import Profile from '@/pages/Profile'
 import Subscription from '@/pages/Subscription'
 import Settings from '@/pages/Settings'
+import MeetingRecord from '@/pages/MeetingRecord'
 import CaptionOverlay from '@/components/CaptionOverlay'
 
 function AuthenticatedApp() {
@@ -27,6 +28,7 @@ function AuthenticatedApp() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/subscription" element={<Subscription />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/records" element={<MeetingRecord />} />
           </Routes>
         </main>
       </div>

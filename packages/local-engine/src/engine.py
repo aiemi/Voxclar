@@ -254,10 +254,52 @@ class MeetingEngine:
 
                 logger.info("Meeting memory saved and user insights updated")
 
+                # 生成详细会议摘要发给前端（仅高级会员 — 前端控制显示）
+                detailed_summary = await self._generate_meeting_summary(
+                    client, model, meeting_text
+                )
+                if detailed_summary and self.on_save_memory:
+                    self.on_save_memory({
+                        "type": "meeting_summary",
+                        "summary": detailed_summary,
+                    })
+
         except Exception as e:
             logger.error(f"Save meeting memory failed: {e}")
         finally:
             self._context.reset()
+
+    async def _generate_meeting_summary(self, client, model: str, meeting_text: str) -> str:
+        """生成详细的会议摘要。"""
+        try:
+            resp = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Generate a professional meeting summary. Include:\n"
+                            "## Key Discussion Points\n"
+                            "- Main topics discussed\n\n"
+                            "## Questions Asked & Responses\n"
+                            "- Each question and how the user responded\n\n"
+                            "## Decisions & Action Items\n"
+                            "- Any decisions made or next steps\n\n"
+                            "## Performance Notes\n"
+                            "- User's communication strengths\n"
+                            "- Areas for improvement\n\n"
+                            "Use markdown formatting. Match the meeting's language."
+                        ),
+                    },
+                    {"role": "user", "content": meeting_text[:6000]},
+                ],
+                max_tokens=1000,
+                temperature=0.2,
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as e:
+            logger.error(f"Meeting summary generation failed: {e}")
+            return ""
 
     def update_settings(self, settings: dict):
         if "denoise" in settings and self._noise_reducer:

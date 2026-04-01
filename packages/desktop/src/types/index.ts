@@ -63,6 +63,14 @@ export interface Transaction {
   created_at: string
 }
 
+export interface MeetingRecord {
+  meeting: Meeting
+  transcripts: Transcript[]
+  answers: Answer[]
+  summary?: string          // AI 摘要（高级会员）
+  summaryGenerating?: boolean
+}
+
 export interface EngineMessage {
   type: 'transcription' | 'question_detected' | 'answer' | 'engine_status' | 'error' | 'pong'
   text?: string

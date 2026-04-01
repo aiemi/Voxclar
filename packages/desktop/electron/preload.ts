@@ -38,6 +38,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
 
+  // 文件导出
+  export: {
+    savePDF: (html: string, filename: string) => ipcRenderer.invoke('export:savePDF', html, filename),
+  },
+
   // 安全状态
   security: {
     getStatus: () => ipcRenderer.invoke('security:getStatus'),

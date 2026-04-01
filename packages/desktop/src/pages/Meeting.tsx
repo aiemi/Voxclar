@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { useEngine } from '@/hooks/useEngine'
 import { useMeetingStore } from '@/stores/meetingStore'
 import type { MeetingType } from '@/types'
@@ -21,6 +22,7 @@ const MEETING_TYPES: { value: MeetingType; labelKey: string }[] = [
 
 export default function Meeting() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { startMeeting, stopMeeting } = useEngine()
   const { transcripts, answers, isRecording, elapsedSeconds, setElapsed } = useMeetingStore()
   const store = useMeetingStore()
@@ -124,6 +126,8 @@ export default function Meeting() {
     clearInterval(timerRef.current)
     electronAPI?.caption.hide()
     setCaptionVisible(false)
+    // 跳转到会议记录页
+    setTimeout(() => navigate('/records'), 500)
   }
 
   const toggleCaption = async () => {

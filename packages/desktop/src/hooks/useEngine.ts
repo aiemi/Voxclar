@@ -76,9 +76,14 @@ export function useEngine() {
           )
           break
         case 'save_memory':
-          // 会议结束后 engine 返回浓缩的记忆 → 存 localStorage
           if (msg.memory) {
             localStorage.setItem('voxclar_memory', JSON.stringify(msg.memory))
+          }
+          break
+        case 'meeting_summary':
+          // AI 会议摘要生成完成
+          if (msg.summary) {
+            useMeetingStore.getState().setLastRecordSummary(msg.summary as string)
           }
           break
         case 'error':
