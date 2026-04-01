@@ -362,31 +362,25 @@ class MeetingEngine:
         self._trigger_detect(text)
 
     def _trigger_detect(self, text: str):
-        """对方说完一段话 → 规则快筛 → 需要时 LLM 深度判断 → 确认是问题才回答。"""
-        if not self._detector:
+        """每个 final → LLM 判断（带上下文）→ 确认是问题才回答。"""
+        if not self._detector or not self._loop:
             return
-
-        # 1. 规则快筛（零延迟）
-        fast = self._detector.detect_fast(text, self._context.language)
-
-        if fast["is_question"]:
-            # 规则高置信命中 → 直接回答
-            self._fire_answer(text, fast["question_type"])
-        elif fast.get("needs_llm"):
-            # 规则没命中 → 交给 LLM 判断（异步，~100ms）
-            if self._loop:
-                self._loop.call_soon_threadsafe(
-                    asyncio.ensure_future,
-                    self._llm_detect_and_answer(text),
-                )
+        self._loop.call_soon_threadsafe(
+            asyncio.ensure_future,
+            self._llm_detect_and_answer(text),
+        )
 
     async def _llm_detect_and_answer(self, text: str):
-        """LLM 深度判断是否是问题，是的话生成回答。"""
-        result = await self._detector.detect_with_llm(text)
+        """LLM 判断：看完整上下文，判断对方是否说完了一个需要回应的点。"""
+        # 把最近几条 final 拼成上下文传给 LLM
+        result = await self._detector.detect_with_llm(text, self._recent_finals)
         if result["is_question"]:
-            self._fire_answer(text, result["question_type"])
+            # 是问题 → 拼接最近的 finals 作为完整问题文本
+            full_question = " ".join(self._recent_finals)
+            self._fire_answer(full_question, result["question_type"])
+            self._recent_finals = []  # 清空，避免重复回答
         else:
-            logger.info(f"[Detect] Not a question: '{text[:60]}...'")
+            logger.info(f"[Detect] Not yet: '{text[:60]}...'")
 
     def _fire_answer(self, text: str, question_type: str):
         """确认是问题 → 通知前端 + 生成 AI 回答。"""

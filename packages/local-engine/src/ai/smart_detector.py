@@ -17,10 +17,15 @@ from src.ai.question_detector import LocalQuestionDetector
 
 logger = logging.getLogger(__name__)
 
-LLM_DETECT_PROMPT = """Interview question detector. Reply ONLY: yes/no,type (technical/behavioral/general)
+LLM_DETECT_PROMPT = """You see a live interview transcript, line by line. The last line is the newest.
+Decide: has the interviewer FINISHED asking something the candidate should respond to?
 
-yes = candidate should respond (questions, requests, prompts to elaborate, challenges)
-no = greetings, transitions, small talk, interviewer's own monologue"""
+yes = the interviewer just completed a question/request/prompt (direct or implicit). The candidate should answer NOW.
+no = the interviewer is still talking (mid-sentence, continuing a thought), or said something that doesn't need a response.
+
+Key: only say "yes" when the interviewer has FINISHED their point and is waiting for the candidate to speak.
+
+Reply ONLY: yes/no,type (technical/behavioral/general)"""
 
 
 class SmartQuestionDetector:
@@ -31,21 +36,11 @@ class SmartQuestionDetector:
         self._language = default_language
 
     def detect_fast(self, text: str, language: str = "") -> dict:
-        """规则快筛（零延迟零成本）。高置信度直接返回，低置信度返回 None 交给 LLM。"""
-        lang = language or self._language
-        result = self._rule_detector.detect(text, lang)
+        """全部交给 LLM 判断，不做规则快筛。"""
+        return {"is_question": False, "needs_llm": True, "confidence": 0, "question_type": "general"}
 
-        if result["is_question"] and result["confidence"] >= 0.5:
-            # 规则引擎高置信度命中
-            logger.info(f"[Detect] Rule hit: confidence={result['confidence']:.2f}, type={result['question_type']}")
-            return result
-
-        # 规则引擎没命中或低置信度 → 需要 LLM 判断
-        return {"is_question": False, "needs_llm": True, "confidence": result["confidence"],
-                "question_type": result["question_type"]}
-
-    async def detect_with_llm(self, text: str) -> dict:
-        """LLM 深度判断（~10ms 延迟，~10 tokens）。"""
+    async def detect_with_llm(self, text: str, recent_context: list[str] | None = None) -> dict:
+        """LLM 判断（带上下文）。"""
         api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
         if not api_key:
             return {"is_question": False, "question_type": "general", "confidence": 0}
@@ -60,11 +55,19 @@ class SmartQuestionDetector:
             )
             model = "deepseek-chat" if use_deepseek else "gpt-4o-mini"
 
+            # 拼上下文：最近几条 + 当前这条（标记为 [LATEST]）
+            lines = []
+            if recent_context:
+                for line in recent_context[:-1]:  # 不含当前
+                    lines.append(line)
+            lines.append(f"[LATEST] {text}")
+            user_msg = "\n".join(lines)
+
             resp = await client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": LLM_DETECT_PROMPT},
-                    {"role": "user", "content": text[:300]},
+                    {"role": "user", "content": user_msg[:500]},
                 ],
                 max_tokens=5,
                 temperature=0,
