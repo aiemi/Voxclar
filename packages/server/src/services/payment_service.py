@@ -101,6 +101,10 @@ async def subscribe(db: AsyncSession, user_id: str, tier: str) -> Subscription:
             description=f"Subscription: {plan['name']}",
         ))
 
+    # 首次付费 → 触发推荐人奖励
+    from src.services.referral_service import grant_referrer_bonus
+    await grant_referrer_bonus(db, user_id)
+
     await db.flush()
     return subscription
 

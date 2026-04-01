@@ -47,32 +47,14 @@ async def register(
         description="Welcome bonus",
     ))
 
-    # Handle referral
+    # Handle referral — 被推荐人注册即获额外分钟
     if referral_code:
-        ref_result = await db.execute(
-            select(Referral).where(
-                Referral.code == referral_code,
-                Referral.status == ReferralStatus.pending,
-            )
-        )
-        referral = ref_result.scalar_one_or_none()
-        if referral:
-            referral.referred_id = user.id
-            referral.status = ReferralStatus.completed
-            referral.bonus_granted = True
-            # Grant referral bonus to referrer
-            referrer_result = await db.execute(
-                select(User).where(User.id == referral.referrer_id)
-            )
-            referrer = referrer_result.scalar_one_or_none()
-            if referrer:
-                referrer.points_balance += 5
-                db.add(Transaction(
-                    user_id=referrer.id,
-                    type=TransactionType.bonus,
-                    points=5,
-                    description=f"Referral bonus: {username} joined",
-                ))
+        from src.services.referral_service import apply_referral_code
+        await apply_referral_code(db, user, referral_code)
+
+    # 自动为新用户生成邀请码
+    from src.services.referral_service import create_invite_code
+    await create_invite_code(db, str(user.id))
 
     return {
         "access_token": create_access_token(str(user.id)),

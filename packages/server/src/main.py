@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import get_settings
 from src.core.exceptions import register_exception_handlers
-from src.api.v1 import auth, users, meetings, transcripts, payments, profiles, asr_proxy, llm_proxy
+from src.api.v1 import auth, users, meetings, transcripts, payments, profiles, asr_proxy, llm_proxy, referrals
 from src.api.websocket import router as ws_router
 
 
@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="IMEET.AI API",
+    title="Voxclar API",
     version="2.0.0",
     description="AI-powered meeting assistant backend",
     lifespan=lifespan,
@@ -46,6 +46,7 @@ app.include_router(payments.router, prefix="/api/v1/payments", tags=["payments"]
 app.include_router(profiles.router, prefix="/api/v1/profiles", tags=["profiles"])
 app.include_router(asr_proxy.router, prefix="/api/v1/asr", tags=["asr"])
 app.include_router(llm_proxy.router, prefix="/api/v1/ai", tags=["ai"])
+app.include_router(referrals.router, prefix="/api/v1/referrals", tags=["referrals"])
 app.include_router(ws_router, prefix="/api/v1/ws", tags=["websocket"])
 
 
