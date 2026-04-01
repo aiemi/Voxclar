@@ -13,14 +13,21 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@tiptap/extension-color": "^3.22.0",
+    "@tiptap/extension-highlight": "^3.22.0",
+    "@tiptap/extension-placeholder": "^3.22.0",
+    "@tiptap/extension-text-align": "^3.22.0",
+    "@tiptap/extension-text-style": "^3.22.0",
+    "@tiptap/react": "^3.22.0",
+    "@tiptap/starter-kit": "^3.22.0",
+    "clsx": "^2.1.0",
+    "i18next": "^24.0.0",
+    "lucide-react": "^0.460.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.0.0",
-    "zustand": "^5.0.0",
-    "i18next": "^24.0.0",
     "react-i18next": "^15.0.0",
-    "lucide-react": "^0.460.0",
-    "clsx": "^2.1.0"
+    "react-router-dom": "^7.0.0",
+    "zustand": "^5.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
@@ -43,10 +50,16 @@
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "icon.icns",
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "win": {
-      "target": ["nsis", "zip"]
+      "target": [
+        "nsis",
+        "zip"
+      ]
     }
   }
 }

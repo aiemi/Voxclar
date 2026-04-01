@@ -79,3 +79,35 @@
     @apply text-imeet-gold bg-imeet-card;
   }
 }
+
+/* Tiptap Editor Dark Theme */
+.tiptap {
+  outline: none;
+  color: #e0e0e0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.tiptap h1, .tiptap h2, .tiptap h3 {
+  color: #FFD700;
+  margin: 16px 0 8px;
+}
+.tiptap h2 { font-size: 18px; border-bottom: 1px solid #3A3B3F; padding-bottom: 6px; }
+.tiptap p { margin: 6px 0; }
+.tiptap strong { color: #fff; }
+.tiptap blockquote {
+  border-left: 3px solid #FFD700;
+  padding: 8px 14px;
+  margin: 12px 0;
+  background: rgba(255, 215, 0, 0.05);
+  border-radius: 4px;
+}
+.tiptap mark { background: rgba(255, 215, 0, 0.3); color: #fff; padding: 0 3px; border-radius: 2px; }
+.tiptap ul, .tiptap ol { margin: 8px 0 8px 20px; }
+.tiptap li { margin: 4px 0; }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #555;
+  pointer-events: none;
+  height: 0;
+}
