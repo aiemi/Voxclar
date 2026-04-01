@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background: #000000;
+    color: #FFFFFF;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #3A3B3F;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #56595F;
+  }
+
+  /* Drag region for frameless window */
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    background: rgba(26, 27, 30, 0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid #3A3B3F;
+    border-radius: 12px;
+  }
+
+  .btn-gold {
+    @apply bg-imeet-gold text-black font-semibold px-6 py-2 rounded-imeet
+           hover:bg-imeet-gold-hover transition-colors duration-200
+           active:scale-95;
+  }
+
+  .btn-outline {
+    @apply border border-imeet-border text-imeet-text-secondary px-6 py-2 rounded-imeet
+           hover:border-imeet-gold hover:text-imeet-gold transition-colors duration-200;
+  }
+
+  .input-field {
+    @apply bg-imeet-card border border-imeet-border rounded-imeet px-4 py-2.5
+           text-white placeholder:text-imeet-text-muted
+           focus:border-imeet-gold focus:outline-none transition-colors duration-200;
+  }
+
+  .card {
+    @apply bg-imeet-panel border border-imeet-border rounded-imeet-lg p-4;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-imeet text-imeet-text-secondary
+           hover:text-imeet-gold hover:bg-imeet-card transition-colors duration-200 cursor-pointer;
+  }
+
+  .nav-item-active {
+    @apply text-imeet-gold bg-imeet-card;
+  }
+}

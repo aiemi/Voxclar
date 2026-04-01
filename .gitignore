@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+.ruff_cache/
+
+# Node
+node_modules/
+dist-electron/
+*.tsbuildinfo
+
+# Electron
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Env
+.env
+.env.local
+.env.production
+
+# Models (download at runtime)
+packages/local-engine/models/*.bin
+packages/local-engine/models/*.pt
+packages/local-engine/models/*.onnx
+
+# Build artifacts
+*.dmg
+*.exe
+*.AppImage
+*.deb
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Test
+.coverage
+htmlcov/
+.pytest_cache/

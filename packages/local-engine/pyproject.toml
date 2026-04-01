@@ -1,0 +1,33 @@
+[tool.poetry]
+name = "imeet-local-engine"
+version = "0.1.0"
+description = "IMEET.AI Local Engine - Audio capture, ASR, and AI processing"
+authors = ["Anwei Liu"]
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+faster-whisper = "^1.1.0"
+torch = "^2.4.0"
+numpy = "^1.26.0"
+scipy = "^1.14.0"
+sounddevice = "^0.5.0"
+websockets = "^13.0"
+pydantic = "^2.0.0"
+scikit-learn = "^1.5.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-asyncio = "^0.24.0"
+ruff = "^0.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

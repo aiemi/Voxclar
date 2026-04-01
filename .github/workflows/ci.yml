@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - run: ruff check packages/server/src/ packages/local-engine/src/
+
+  test-server:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: imeet_test
+          POSTGRES_USER: imeet
+          POSTGRES_PASSWORD: testpassword
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install poetry
+      - working-directory: packages/server
+        run: poetry install
+      - working-directory: packages/server
+        run: poetry run pytest
+        env:
+          DATABASE_URL: postgresql+asyncpg://imeet:testpassword@localhost:5432/imeet_test
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret
+          REFRESH_SECRET: test-refresh-secret
+
+  test-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install poetry
+      - working-directory: packages/local-engine
+        run: poetry install
+      - working-directory: packages/local-engine
+        run: poetry run pytest

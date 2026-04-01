@@ -1,0 +1,44 @@
+[tool.poetry]
+name = "imeet-server"
+version = "0.1.0"
+description = "IMEET.AI Cloud Backend Service"
+authors = ["Anwei Liu"]
+readme = "README.md"
+packages = [{include = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.0"}
+asyncpg = "^0.30.0"
+alembic = "^1.14.0"
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+bcrypt = "^4.2.0"
+pydantic = {extras = ["email"], version = "^2.0.0"}
+pydantic-settings = "^2.0.0"
+redis = {extras = ["hiredis"], version = "^5.0.0"}
+boto3 = "^1.35.0"
+openai = "^1.50.0"
+anthropic = "^0.40.0"
+httpx = "^0.27.0"
+python-multipart = "^0.0.12"
+pgvector = "^0.3.0"
+deepgram-sdk = "^3.7.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+pytest-asyncio = "^0.24.0"
+httpx = "^0.27.0"
+ruff = "^0.8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

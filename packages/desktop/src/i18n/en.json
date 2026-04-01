@@ -1,0 +1,90 @@
+{
+  "app": { "name": "Voxclar" },
+  "nav": {
+    "dashboard": "Dashboard",
+    "meeting": "Meetings",
+    "profile": "Profile",
+    "subscription": "Subscription",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "welcome": "Welcome back",
+    "quick_start": "Start New Meeting",
+    "recent": "Recent Meetings",
+    "stats": { "meetings": "Meetings", "hours": "Total Hours", "points": "Points Balance" },
+    "engine_status": "Engine Status"
+  },
+  "meeting": {
+    "new": "New Meeting",
+    "topic": "Meeting Topic",
+    "type": "Meeting Type",
+    "language": "Language",
+    "prep_notes": "Preparation Notes",
+    "start": "Start Meeting",
+    "stop": "End Meeting",
+    "history": "Meeting History",
+    "types": {
+      "general": "General Meeting",
+      "phone_screen": "Phone Screen",
+      "technical": "Technical Interview",
+      "coffee_chat": "Coffee Chat",
+      "project_kickoff": "Project Kickoff",
+      "weekly_standup": "Weekly Standup"
+    },
+    "transcript": "Transcript",
+    "ai_answers": "AI Answers",
+    "no_meetings": "No meetings yet"
+  },
+  "profile": {
+    "title": "Your Profile",
+    "name": "Full Name",
+    "headline": "Headline",
+    "summary": "Summary",
+    "education": "Education",
+    "experience": "Work Experience",
+    "projects": "Projects",
+    "skills": "Skills",
+    "upload_resume": "Upload Resume (PDF)",
+    "save": "Save Profile"
+  },
+  "subscription": {
+    "title": "Subscription Plans",
+    "current": "Current Plan",
+    "points": "Points Balance",
+    "buy_points": "Buy Points",
+    "history": "Transaction History"
+  },
+  "settings": {
+    "title": "Settings",
+    "audio_device": "Audio Device",
+    "language": "Language",
+    "asr_mode": "ASR Mode",
+    "auto": "Auto",
+    "local": "Local",
+    "cloud": "Cloud",
+    "account": "Account",
+    "about": "About",
+    "version": "Version"
+  },
+  "auth": {
+    "login": "Log In",
+    "register": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "username": "Username",
+    "forgot": "Forgot Password?",
+    "no_account": "Don't have an account?",
+    "has_account": "Already have an account?"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "export": "Export",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "minutes": "min",
+    "unlimited": "Unlimited"
+  }
+}

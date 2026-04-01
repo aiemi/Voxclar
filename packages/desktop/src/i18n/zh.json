@@ -1,0 +1,90 @@
+{
+  "app": { "name": "Voxclar" },
+  "nav": {
+    "dashboard": "仪表盘",
+    "meeting": "会议",
+    "profile": "个人简历",
+    "subscription": "订阅",
+    "settings": "设置"
+  },
+  "dashboard": {
+    "welcome": "欢迎回来",
+    "quick_start": "开始新会议",
+    "recent": "最近会议",
+    "stats": { "meetings": "会议次数", "hours": "总时长", "points": "积分余额" },
+    "engine_status": "引擎状态"
+  },
+  "meeting": {
+    "new": "新会议",
+    "topic": "会议主题",
+    "type": "会议类型",
+    "language": "语言",
+    "prep_notes": "准备笔记",
+    "start": "开始会议",
+    "stop": "结束会议",
+    "history": "会议历史",
+    "types": {
+      "general": "普通会议",
+      "phone_screen": "电话面试",
+      "technical": "技术面试",
+      "coffee_chat": "闲聊",
+      "project_kickoff": "项目启动",
+      "weekly_standup": "周会"
+    },
+    "transcript": "转写记录",
+    "ai_answers": "AI 回答",
+    "no_meetings": "暂无会议"
+  },
+  "profile": {
+    "title": "个人简历",
+    "name": "姓名",
+    "headline": "头衔",
+    "summary": "个人简介",
+    "education": "教育经历",
+    "experience": "工作经历",
+    "projects": "项目经历",
+    "skills": "技能",
+    "upload_resume": "上传简历 (PDF)",
+    "save": "保存"
+  },
+  "subscription": {
+    "title": "订阅计划",
+    "current": "当前计划",
+    "points": "积分余额",
+    "buy_points": "购买积分",
+    "history": "交易历史"
+  },
+  "settings": {
+    "title": "设置",
+    "audio_device": "音频设备",
+    "language": "语言",
+    "asr_mode": "语音识别模式",
+    "auto": "自动",
+    "local": "本地",
+    "cloud": "云端",
+    "account": "账户",
+    "about": "关于",
+    "version": "版本"
+  },
+  "auth": {
+    "login": "登录",
+    "register": "注册",
+    "email": "邮箱",
+    "password": "密码",
+    "username": "用户名",
+    "forgot": "忘记密码？",
+    "no_account": "没有账户？",
+    "has_account": "已有账户？"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "export": "导出",
+    "loading": "加载中...",
+    "error": "错误",
+    "success": "成功",
+    "minutes": "分钟",
+    "unlimited": "无限"
+  }
+}
