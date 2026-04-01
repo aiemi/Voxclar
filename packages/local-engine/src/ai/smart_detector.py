@@ -17,12 +17,23 @@ from src.ai.question_detector import LocalQuestionDetector
 
 logger = logging.getLogger(__name__)
 
-LLM_DETECT_PROMPT = """This is what an interviewer just said (they have stopped speaking). Should the candidate respond?
+LLM_DETECT_PROMPT = """In a live interview, the other person just said this. Should the AI generate a suggested response for the user?
 
-yes = question, request, prompt, challenge, or any statement expecting a response
-no = pure small talk, greeting, or transition with no response expected
+yes = ANY of these:
+- Direct or indirect question
+- Request ("tell me", "walk me through", "describe")
+- Statement that implies the user should respond or elaborate
+- Substantial statement where the speaker has shared their view and is waiting for input
+- ANY speech longer than 2 sentences (in interviews, long statements almost always expect a reply)
 
-Reply EXACTLY like: yes,behavioral OR yes,technical OR yes,general OR no,none"""
+no = ONLY these:
+- Very short greeting ("hi", "nice to meet you")
+- Pure transition ("let's move on", "okay next question")
+- Less than 5 words with no substance
+
+When in doubt, say yes. It's better to generate an unnecessary suggestion than to miss a question.
+
+Reply EXACTLY: yes,behavioral OR yes,technical OR yes,general OR no,none"""
 
 
 class SmartQuestionDetector:

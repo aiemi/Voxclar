@@ -366,11 +366,22 @@ class MeetingEngine:
             self._recent_system_text = ""
 
     def _on_mic_transcript(self, result: dict):
-        """麦克风转写 → 存入上下文。"""
+        """麦克风转写 → 去重后存入上下文。"""
         if not result.get("is_final"):
             return
 
         text = result.get("text", "")
+        if len(text) < 5:
+            return
+
+        # 回声去重：如果 mic 转写和最近的系统音频高度相似，说明是扬声器回声，丢弃
+        if self._recent_system_text:
+            from difflib import SequenceMatcher
+            similarity = SequenceMatcher(None, text.lower(), self._recent_system_text.lower()[-len(text)-50:]).ratio()
+            if similarity > 0.5:
+                logger.debug(f"[Mic] Echo rejected (similarity={similarity:.2f}): '{text[:40]}...'")
+                return
+
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
 
         self._context.add_user_utterance(text)
