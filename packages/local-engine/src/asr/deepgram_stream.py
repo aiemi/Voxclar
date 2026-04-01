@@ -65,18 +65,18 @@ class DeepgramStream:
         #   utterance_end_ms=1500 (1.5秒静音认为一句话结束)
         #   vad_events=true (VAD 事件)
         #   encoding=linear16, sample_rate=16000, channels=1
-        lang_param = f"&language={self.language}" if self.language and self.language != "multi" else "&detect_language=true"
+        lang_param = self.language if self.language and self.language != "multi" else "multi"
         url = (
             f"{DEEPGRAM_WS_URL}"
             f"?model=nova-2"
+            f"&language={lang_param}"
             f"&smart_format=true"
             f"&interim_results=true"
-            f"&utterance_end_ms=1500"
+            f"&endpointing=1500"
             f"&vad_events=true"
             f"&encoding=linear16"
             f"&sample_rate={self.sample_rate}"
             f"&channels=1"
-            f"{lang_param}"
         )
 
         try:
