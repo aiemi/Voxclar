@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
-import { Check, Crown, Star, Zap, Timer } from 'lucide-react'
+import { Check, Crown, Star, Zap, Timer, Gift, Copy, CheckCircle, Users } from 'lucide-react'
 
 const PLANS = [
   {
@@ -63,9 +64,29 @@ const PLANS = [
   },
 ]
 
+// 本地生成邀请码（后端没跑时的 fallback）
+function getOrCreateInviteCode(): string {
+  const key = 'voxclar_invite_code'
+  let code = localStorage.getItem(key)
+  if (!code) {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+    code = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+    localStorage.setItem(key, code)
+  }
+  return code
+}
+
 export default function Subscription() {
   const user = useAuthStore((s) => s.user)
   const currentTier = user?.subscription_tier || 'free'
+  const [copied, setCopied] = useState(false)
+  const inviteCode = getOrCreateInviteCode()
+
+  const copyCode = () => {
+    navigator.clipboard.writeText(inviteCode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   return (
     <div className="space-y-8">
@@ -147,6 +168,75 @@ export default function Subscription() {
             </div>
           )
         })}
+      </div>
+
+      {/* Invite Friends */}
+      <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-lg bg-imeet-gold/10 flex items-center justify-center">
+            <Gift size={20} className="text-imeet-gold" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-lg">Invite Friends, Earn Free Time</h3>
+            <p className="text-xs text-imeet-text-muted">Share your code — both of you get bonus minutes</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-5">
+          {/* Invite Code */}
+          <div>
+            <p className="text-xs text-imeet-text-muted mb-2 uppercase tracking-wider">Your Invite Code</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-black/30 border-2 border-imeet-gold/30 rounded-lg px-4 py-3 text-center">
+                <span className="text-2xl font-mono font-bold tracking-[0.3em] text-imeet-gold">{inviteCode}</span>
+              </div>
+              <button
+                onClick={copyCode}
+                className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                  copied
+                    ? 'bg-green-500/20 text-green-400'
+                    : 'bg-imeet-gold text-black hover:bg-imeet-gold-hover active:scale-[0.95]'
+                }`}
+              >
+                {copied ? <CheckCircle size={18} /> : <Copy size={18} />}
+              </button>
+            </div>
+            <p className="text-[11px] text-imeet-text-muted mt-2">
+              Share this code with friends when they sign up
+            </p>
+          </div>
+
+          {/* Rewards Info */}
+          <div className="space-y-3">
+            <p className="text-xs text-imeet-text-muted uppercase tracking-wider">How It Works</p>
+            <div className="space-y-2">
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 rounded-full bg-imeet-gold/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-[10px] text-imeet-gold font-bold">1</span>
+                </div>
+                <p className="text-sm text-imeet-text-secondary">Friend signs up with your code → <span className="text-imeet-gold font-medium">they get 10 min free</span></p>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 rounded-full bg-imeet-gold/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-[10px] text-imeet-gold font-bold">2</span>
+                </div>
+                <p className="text-sm text-imeet-text-secondary">Friend makes first purchase → <span className="text-imeet-gold font-medium">you get 30 min free</span></p>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="flex gap-4 pt-2">
+              <div className="flex items-center gap-1.5 text-xs text-imeet-text-muted">
+                <Users size={12} />
+                <span>0 invited</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-imeet-text-muted">
+                <Timer size={12} />
+                <span>0 min earned</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
