@@ -17,28 +17,12 @@ from src.ai.question_detector import LocalQuestionDetector
 
 logger = logging.getLogger(__name__)
 
-LLM_DETECT_PROMPT = """You are inside a live interview. You see the interviewer's speech in real-time, line by line.
+LLM_DETECT_PROMPT = """This is what an interviewer just said (they have stopped speaking). Should the candidate respond?
 
-Your job: decide if the interviewer has FINISHED speaking and it's the candidate's turn to respond.
+yes = question, request, prompt, challenge, or any statement expecting a response
+no = pure small talk, greeting, or transition with no response expected
 
-Say YES when:
-- Interviewer asked a question (with or without ?)
-- Interviewer said "tell me about...", "walk me through...", "describe..."
-- Interviewer finished a long statement and is clearly waiting for a response
-- Interviewer made a comment that implies the candidate should elaborate
-- Interviewer stopped talking after making a point (the [LATEST] line feels like an ending)
-
-Say NO when:
-- Interviewer is clearly mid-sentence (the [LATEST] line is incomplete)
-- Interviewer is still building up to their point
-
-In interviews, when someone finishes a substantial statement, they usually expect a response.
-
-Reply with EXACTLY one word then a comma then one word. Example responses:
-yes,behavioral
-yes,technical
-yes,general
-no,none"""
+Reply EXACTLY like: yes,behavioral OR yes,technical OR yes,general OR no,none"""
 
 
 class SmartQuestionDetector:
@@ -52,8 +36,8 @@ class SmartQuestionDetector:
         """全部交给 LLM 判断，不做规则快筛。"""
         return {"is_question": False, "needs_llm": True, "confidence": 0, "question_type": "general"}
 
-    async def detect_with_llm(self, text: str, recent_context: list[str] | None = None) -> dict:
-        """LLM 判断（带上下文）。"""
+    async def detect_with_llm(self, text: str) -> dict:
+        """LLM 判断完整文本是否需要回应。"""
         api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
         if not api_key:
             return {"is_question": False, "question_type": "general", "confidence": 0}
@@ -68,19 +52,11 @@ class SmartQuestionDetector:
             )
             model = "deepseek-chat" if use_deepseek else "gpt-4o-mini"
 
-            # 拼上下文：最近几条 + 当前这条（标记为 [LATEST]）
-            lines = []
-            if recent_context:
-                for line in recent_context[:-1]:  # 不含当前
-                    lines.append(line)
-            lines.append(f"[LATEST] {text}")
-            user_msg = "\n".join(lines)
-
             resp = await client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": LLM_DETECT_PROMPT},
-                    {"role": "user", "content": user_msg[:500]},
+                    {"role": "user", "content": text[:800]},
                 ],
                 max_tokens=5,
                 temperature=0,

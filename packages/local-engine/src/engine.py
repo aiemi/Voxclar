@@ -59,7 +59,11 @@ class MeetingEngine:
         # 状态
         self._meeting_title = ""
         self._meeting_start_time = 0.0
-        self._recent_finals: list[str] = []  # 最近几条 final 做上下文
+        self._recent_system_text = ""
+        self._last_system_final_time = 0.0
+        self._CONTEXT_WINDOW = 8.0          # 8秒内的 final 拼在一起
+        self._silence_timer: asyncio.TimerHandle | None = None
+        self._SILENCE_GAP = 2.5             # 2.5秒无新 final = 对方说完了
 
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
@@ -162,8 +166,14 @@ class MeetingEngine:
                 asyncio.run_coroutine_threadsafe(self._system_deepgram.disconnect(), self._loop)
             if self._mic_deepgram:
                 asyncio.run_coroutine_threadsafe(self._mic_deepgram.disconnect(), self._loop)
+            if self._recent_system_text and len(self._recent_system_text) > 20:
+                asyncio.run_coroutine_threadsafe(
+                    self._on_silence(), self._loop
+                )
             asyncio.run_coroutine_threadsafe(self._save_meeting_memory(), self._loop)
-        self._recent_finals = []
+        if self._silence_timer:
+            self._silence_timer.cancel()
+        self._recent_system_text = ""
         logger.info("Meeting stopped")
 
     async def _save_meeting_memory(self):
@@ -334,7 +344,7 @@ class MeetingEngine:
     # ═══════════════════════════════════════════════════════════════════
 
     def _on_system_transcript(self, result: dict):
-        """系统音频转写 → 字幕 + 每个 final 立即检测。"""
+        """系统音频转写 → 字幕 + 累积文本 + 静默触发检测。"""
         text = result.get("text", "")
         is_final = result.get("is_final", False)
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
@@ -349,38 +359,42 @@ class MeetingEngine:
                 "speaker": "other",
             })
 
-        if not is_final or len(text.strip()) < 10:
+        if not is_final or len(text.strip()) < 5:
             return
 
-        # 保留最近 5 条 final 做上下文
-        self._recent_finals.append(text)
-        if len(self._recent_finals) > 5:
-            self._recent_finals.pop(0)
-
-        # 每个 final 都立即检测
-        logger.info(f"[Transcript] final: '{text[:60]}'")
-        self._trigger_detect(text)
-
-    def _trigger_detect(self, text: str):
-        """每个 final → LLM 判断（带上下文）→ 确认是问题才回答。"""
-        if not self._detector or not self._loop:
-            return
-        self._loop.call_soon_threadsafe(
-            asyncio.ensure_future,
-            self._llm_detect_and_answer(text),
-        )
-
-    async def _llm_detect_and_answer(self, text: str):
-        """LLM 判断：看完整上下文，判断对方是否说完了一个需要回应的点。"""
-        # 把最近几条 final 拼成上下文传给 LLM
-        result = await self._detector.detect_with_llm(text, self._recent_finals)
-        if result["is_question"]:
-            # 是问题 → 拼接最近的 finals 作为完整问题文本
-            full_question = " ".join(self._recent_finals)
-            self._fire_answer(full_question, result["question_type"])
-            self._recent_finals = []  # 清空，避免重复回答
+        # 累积 final 文本（8秒窗口内拼接）
+        now = time.time()
+        if now - self._last_system_final_time < self._CONTEXT_WINDOW:
+            self._recent_system_text = (self._recent_system_text + " " + text).strip()
         else:
-            logger.info(f"[Detect] Not yet: '{text[:60]}...'")
+            self._recent_system_text = text
+        self._last_system_final_time = now
+
+        logger.info(f"[Transcript] final: '{text[:50]}' | total: {len(self._recent_system_text)} chars")
+
+        # 重置静默计时器 — 每来一个 final 就重置
+        # 当2.5秒没有新 final 时，触发 LLM 检测
+        if self._loop and self._silence_timer:
+            self._silence_timer.cancel()
+        if self._loop:
+            self._silence_timer = self._loop.call_later(
+                self._SILENCE_GAP,
+                lambda: asyncio.ensure_future(self._on_silence()),
+            )
+
+    async def _on_silence(self):
+        """对方停止说话2.5秒 → 用 LLM 判断累积的完整文本是否需要回应。"""
+        text = self._recent_system_text.strip()
+        if not text or len(text) < 20:
+            return
+
+        logger.info(f"[Silence] Checking {len(text)} chars: '{text[:80]}...'")
+
+        result = await self._detector.detect_with_llm(text)
+        if result["is_question"]:
+            self._fire_answer(text, result["question_type"])
+        else:
+            logger.info(f"[Detect] Not a question: '{text[:60]}...'")
 
     def _fire_answer(self, text: str, question_type: str):
         """确认是问题 → 通知前端 + 生成 AI 回答。"""
@@ -401,7 +415,7 @@ class MeetingEngine:
                 asyncio.ensure_future,
                 self._generate_answer(text, question_type),
             )
-        self._recent_system_text = ""
+        self._recent_system_text = ""  # 清空，避免重复回答
 
     def _on_mic_transcript(self, result: dict):
         """麦克风转写 → 存入上下文（用户自己说的话）。"""
