@@ -9,7 +9,7 @@ import { useMeetingStore, loadRecords } from '@/stores/meetingStore'
 import { useAuthStore } from '@/stores/authStore'
 import type { MeetingRecord } from '@/types'
 import {
-  ArrowLeft, Clock, MessageSquare, FileText, Lock, Copy, CheckCircle,
+  Clock, MessageSquare, FileText, Lock, Copy, CheckCircle,
   FileDown, Bold, Italic, List, ListOrdered, AlignLeft, AlignCenter,
   Heading2, Highlighter, Undo, Redo, Eye, Pencil,
 } from 'lucide-react'
@@ -115,13 +115,6 @@ export default function MeetingRecordPage() {
     <div className="h-full flex gap-5">
       {/* Left: Meeting List */}
       <div className="w-60 flex-shrink-0 flex flex-col gap-2">
-        <button
-          onClick={() => navigate('/meeting')}
-          className="flex items-center gap-2 text-sm text-imeet-text-secondary hover:text-imeet-gold transition-colors mb-2"
-        >
-          <ArrowLeft size={14} /> Back to Meeting
-        </button>
-
         <h3 className="text-sm font-semibold text-imeet-gold mb-1">Meeting History</h3>
 
         <div className="flex-1 overflow-y-auto space-y-1.5">
