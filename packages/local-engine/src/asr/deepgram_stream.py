@@ -37,6 +37,7 @@ class DeepgramStream:
     ):
         self.language = language
         self.on_transcript = on_transcript
+        self.on_utterance_end: Callable[[], None] | None = None
         self.sample_rate = sample_rate
 
         self._ws: websockets.WebSocketClientProtocol | None = None
@@ -134,8 +135,10 @@ class DeepgramStream:
                 if msg_type == "Results":
                     self._handle_result(data)
                 elif msg_type == "UtteranceEnd":
-                    # Deepgram 认为一段话结束了
-                    pass  # final 已经在 Results 里标了 is_final
+                    # Deepgram 判断这个人说完了一段话
+                    logger.info("[Deepgram] UtteranceEnd received")
+                    if self.on_utterance_end:
+                        self.on_utterance_end()
                 elif msg_type == "Error":
                     logger.error(f"Deepgram error: {data}")
 

@@ -60,10 +60,7 @@ class MeetingEngine:
         self._meeting_title = ""
         self._meeting_start_time = 0.0
         self._recent_system_text = ""
-        self._last_system_final_time = 0.0
-        self._CONTEXT_WINDOW = 8.0          # 8秒内的 final 拼在一起
-        self._silence_timer: asyncio.TimerHandle | None = None
-        self._SILENCE_GAP = 2.5             # 2.5秒无新 final = 对方说完了
+        self._last_checked_text = ""        # 避免重复检测
 
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
@@ -106,6 +103,7 @@ class MeetingEngine:
             language=language,
             on_transcript=self._on_system_transcript,
         )
+        self._system_deepgram.on_utterance_end = self._on_utterance_end
         self._mic_deepgram = DeepgramStream(
             language=language,
             on_transcript=self._on_mic_transcript,
@@ -168,12 +166,11 @@ class MeetingEngine:
                 asyncio.run_coroutine_threadsafe(self._mic_deepgram.disconnect(), self._loop)
             if self._recent_system_text and len(self._recent_system_text) > 20:
                 asyncio.run_coroutine_threadsafe(
-                    self._on_silence(), self._loop
+                    self._detect_and_answer(self._recent_system_text), self._loop
                 )
             asyncio.run_coroutine_threadsafe(self._save_meeting_memory(), self._loop)
-        if self._silence_timer:
-            self._silence_timer.cancel()
         self._recent_system_text = ""
+        self._last_checked_text = ""
         logger.info("Meeting stopped")
 
     async def _save_meeting_memory(self):
@@ -344,7 +341,7 @@ class MeetingEngine:
     # ═══════════════════════════════════════════════════════════════════
 
     def _on_system_transcript(self, result: dict):
-        """系统音频转写 → 字幕 + 累积文本 + 静默触发检测。"""
+        """系统音频转写 → 字幕 + 累积文本（不检测，等 UtteranceEnd）。"""
         text = result.get("text", "")
         is_final = result.get("is_final", False)
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
@@ -362,34 +359,28 @@ class MeetingEngine:
         if not is_final or len(text.strip()) < 5:
             return
 
-        # 累积 final 文本（8秒窗口内拼接）
-        now = time.time()
-        if now - self._last_system_final_time < self._CONTEXT_WINDOW:
-            self._recent_system_text = (self._recent_system_text + " " + text).strip()
-        else:
-            self._recent_system_text = text
-        self._last_system_final_time = now
-
+        # 只累积，不检测 — 等 Deepgram UtteranceEnd 信号
+        self._recent_system_text = (self._recent_system_text + " " + text).strip()
         logger.info(f"[Transcript] final: '{text[:50]}' | total: {len(self._recent_system_text)} chars")
 
-        # 重置静默计时器 — 每来一个 final 就重置
-        # 当2.5秒没有新 final 时，触发 LLM 检测
-        if self._loop and self._silence_timer:
-            self._silence_timer.cancel()
-        if self._loop:
-            self._silence_timer = self._loop.call_later(
-                self._SILENCE_GAP,
-                lambda: asyncio.ensure_future(self._on_silence()),
-            )
-
-    async def _on_silence(self):
-        """对方停止说话2.5秒 → 用 LLM 判断累积的完整文本是否需要回应。"""
+    def _on_utterance_end(self):
+        """Deepgram 判断对方说完了一段话 → 用 LLM 检测是否需要回应。"""
         text = self._recent_system_text.strip()
         if not text or len(text) < 20:
             return
 
-        logger.info(f"[Silence] Checking {len(text)} chars: '{text[:80]}...'")
+        # 避免重复检测同一段文本
+        if text == self._last_checked_text:
+            return
+        self._last_checked_text = text
 
+        logger.info(f"[UtteranceEnd] Checking {len(text)} chars: '{text[:80]}...'")
+
+        if self._loop:
+            asyncio.ensure_future(self._detect_and_answer(text))
+
+    async def _detect_and_answer(self, text: str):
+        """LLM 判断完整文本是否需要回应。"""
         result = await self._detector.detect_with_llm(text)
         if result["is_question"]:
             self._fire_answer(text, result["question_type"])
