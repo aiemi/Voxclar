@@ -17,22 +17,10 @@ from src.ai.question_detector import LocalQuestionDetector
 
 logger = logging.getLogger(__name__)
 
-LLM_DETECT_PROMPT = """You are an interview question detector. Given what an interviewer just said, determine:
-1. Is this something the candidate should respond to? (yes/no)
-2. Type: technical, behavioral, or general
+LLM_DETECT_PROMPT = """Interview question detector. Reply ONLY: yes/no,type (technical/behavioral/general)
 
-"Should respond" includes:
-- Direct questions (with or without question marks)
-- Requests: "tell me about...", "walk me through...", "describe..."
-- Prompts to elaborate: "that's interesting", "go on", "and then?"
-- Challenges: "but what about...", "how would you handle..."
-- Statements clearly expecting a response in an interview context
-
-NOT questions: greetings, transitions ("let's move on"), small talk, interviewer's own statements not expecting a response.
-
-Output ONLY one line: yes/no,type
-Examples: "yes,behavioral" or "no,general" or "yes,technical"
-"""
+yes = candidate should respond (questions, requests, prompts to elaborate, challenges)
+no = greetings, transitions, small talk, interviewer's own monologue"""
 
 
 class SmartQuestionDetector:
@@ -76,9 +64,9 @@ class SmartQuestionDetector:
                 model=model,
                 messages=[
                     {"role": "system", "content": LLM_DETECT_PROMPT},
-                    {"role": "user", "content": text[:500]},
+                    {"role": "user", "content": text[:300]},
                 ],
-                max_tokens=10,
+                max_tokens=5,
                 temperature=0,
             )
             answer = (resp.choices[0].message.content or "").strip().lower()

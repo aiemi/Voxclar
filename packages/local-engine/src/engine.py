@@ -59,10 +59,7 @@ class MeetingEngine:
         # 状态
         self._meeting_title = ""
         self._meeting_start_time = 0.0
-        self._recent_system_text = ""
-        self._last_system_final_time = 0.0
-        self._CONTEXT_WINDOW = 4.0    # 4秒静默 = 一段话说完了
-        self._MAX_ACCUMULATE = 300    # 超过 300 字符立即触发回答
+        self._recent_finals: list[str] = []  # 最近几条 final 做上下文
 
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
@@ -157,10 +154,6 @@ class MeetingEngine:
         if not self.is_running:
             return
 
-        # Flush 残留的累积文本
-        if self._recent_system_text and len(self._recent_system_text) > 30:
-            self._trigger_detect(self._recent_system_text)
-
         self.is_running = False
         if self._capture:
             self._capture.stop()
@@ -170,7 +163,7 @@ class MeetingEngine:
             if self._mic_deepgram:
                 asyncio.run_coroutine_threadsafe(self._mic_deepgram.disconnect(), self._loop)
             asyncio.run_coroutine_threadsafe(self._save_meeting_memory(), self._loop)
-        self._recent_system_text = ""
+        self._recent_finals = []
         logger.info("Meeting stopped")
 
     async def _save_meeting_memory(self):
@@ -341,7 +334,7 @@ class MeetingEngine:
     # ═══════════════════════════════════════════════════════════════════
 
     def _on_system_transcript(self, result: dict):
-        """系统音频转写 → 字幕 + 智能回答触发。"""
+        """系统音频转写 → 字幕 + 每个 final 立即检测。"""
         text = result.get("text", "")
         is_final = result.get("is_final", False)
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
@@ -356,26 +349,17 @@ class MeetingEngine:
                 "speaker": "other",
             })
 
-        if not is_final:
+        if not is_final or len(text.strip()) < 10:
             return
 
-        # 累积对方说的 final 文本
-        now = time.time()
-        if now - self._last_system_final_time < self._CONTEXT_WINDOW:
-            self._recent_system_text = (self._recent_system_text + " " + text).strip()
-        else:
-            # 静默超过阈值 → 之前的段落结束，触发回答
-            if self._recent_system_text and len(self._recent_system_text) > 30:
-                self._trigger_detect(self._recent_system_text)
-            self._recent_system_text = text
-        self._last_system_final_time = now
+        # 保留最近 5 条 final 做上下文
+        self._recent_finals.append(text)
+        if len(self._recent_finals) > 5:
+            self._recent_finals.pop(0)
 
-        # 累积文本超长 → 立即触发（不等静默）
-        if len(self._recent_system_text) >= self._MAX_ACCUMULATE:
-            self._trigger_detect(self._recent_system_text)
-            self._recent_system_text = ""
-
-        logger.info(f"[Transcript] final: '{text[:60]}' | buffer: {len(self._recent_system_text)} chars")
+        # 每个 final 都立即检测
+        logger.info(f"[Transcript] final: '{text[:60]}'")
+        self._trigger_detect(text)
 
     def _trigger_detect(self, text: str):
         """对方说完一段话 → 规则快筛 → 需要时 LLM 深度判断 → 确认是问题才回答。"""

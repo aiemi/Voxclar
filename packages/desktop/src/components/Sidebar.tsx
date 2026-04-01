@@ -2,12 +2,13 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/authStore'
 import { useEngineStore } from '@/stores/engineStore'
-import { LayoutDashboard, MessageSquare, User, CreditCard, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, User, CreditCard, Settings, LogOut, FileText } from 'lucide-react'
 import clsx from 'clsx'
 
 const NAV_ITEMS = [
   { path: '/', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
   { path: '/meeting', icon: MessageSquare, labelKey: 'nav.meeting' },
+  { path: '/records', icon: FileText, label: 'Records' },
   { path: '/profile', icon: User, labelKey: 'nav.profile' },
   { path: '/subscription', icon: CreditCard, labelKey: 'nav.subscription' },
   { path: '/settings', icon: Settings, labelKey: 'nav.settings' },
@@ -53,7 +54,7 @@ export default function Sidebar() {
               className={clsx('nav-item w-full', isActive && 'nav-item-active')}
             >
               <item.icon size={18} />
-              <span className="text-sm">{t(item.labelKey)}</span>
+              <span className="text-sm">{'label' in item ? item.label : t(item.labelKey)}</span>
             </button>
           )
         })}
