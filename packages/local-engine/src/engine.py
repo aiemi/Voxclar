@@ -19,7 +19,6 @@ from src.asr.deepgram_stream import DeepgramStream
 from src.ai.smart_detector import SmartQuestionDetector
 from src.ai.answer_generator import generate_answer
 from src.ai.meeting_context import MeetingContext
-from src.ai.document_summarizer import summarize_document
 from src.ai.user_memory import UserMemory, MeetingSummary, MEETING_SUMMARY_PROMPT, USER_INSIGHT_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -49,7 +48,7 @@ class MeetingEngine:
         self._mic_deepgram: DeepgramStream | None = None
 
         # AI
-        self._question_detector: LocalQuestionDetector | None = None
+        self._detector: SmartQuestionDetector | None = None
         self._context: MeetingContext = MeetingContext()
         self._memory: UserMemory = UserMemory()
 
@@ -60,8 +59,8 @@ class MeetingEngine:
         self._meeting_title = ""
         self._meeting_start_time = 0.0
         self._recent_system_text = ""
-        self._last_checked_text = ""
-        self._pending_detect: asyncio.Task | None = None
+        self._last_system_final_time = 0.0
+        self._CONTEXT_WINDOW = 8.0
 
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
@@ -82,7 +81,7 @@ class MeetingEngine:
             except Exception:
                 self._memory = UserMemory()
 
-        # 设置会议上下文（当前准备资料 > profile > 历史记忆）
+        # 设置会议上下文
         self._context = MeetingContext()
         self._context.set_fixed_context(
             profile_summary=profile_context,
@@ -96,7 +95,7 @@ class MeetingEngine:
         self._noise_reducer = AdaptiveNoiseReducer()
         self._echo_canceller = EchoCanceller()
 
-        # 智能问题检测（规则 + LLM）
+        # 智能问题检测（LLM）
         self._detector = SmartQuestionDetector(default_language=language)
 
         # Deepgram
@@ -104,7 +103,6 @@ class MeetingEngine:
             language=language,
             on_transcript=self._on_system_transcript,
         )
-        self._system_deepgram.on_utterance_end = self._on_utterance_end
         self._mic_deepgram = DeepgramStream(
             language=language,
             on_transcript=self._on_mic_transcript,
@@ -156,7 +154,6 @@ class MeetingEngine:
     def stop_meeting(self):
         if not self.is_running:
             return
-
         self.is_running = False
         if self._capture:
             self._capture.stop()
@@ -165,21 +162,13 @@ class MeetingEngine:
                 asyncio.run_coroutine_threadsafe(self._system_deepgram.disconnect(), self._loop)
             if self._mic_deepgram:
                 asyncio.run_coroutine_threadsafe(self._mic_deepgram.disconnect(), self._loop)
-            if self._recent_system_text and len(self._recent_system_text) > 20:
-                asyncio.run_coroutine_threadsafe(
-                    self._detect_and_answer(self._recent_system_text), self._loop
-                )
             asyncio.run_coroutine_threadsafe(self._save_meeting_memory(), self._loop)
         self._recent_system_text = ""
-        self._last_checked_text = ""
-        if self._pending_detect and not self._pending_detect.done():
-            self._pending_detect.cancel()
         logger.info("Meeting stopped")
 
     async def _save_meeting_memory(self):
         """会议结束后浓缩本次会议内容，更新用户记忆。"""
         try:
-            # 收集本次会议的 Q&A
             qa_text = ""
             for qa in self._context.qa_history:
                 qa_text += f"Q ({qa.question_type}): {qa.question}\n"
@@ -192,7 +181,6 @@ class MeetingEngine:
                 self._context.reset()
                 return
 
-            # 用 AI 浓缩会议
             meeting_text = f"Meeting type: {self._context.meeting_type}\n\nQ&A:\n{qa_text}\n\nUser said:\n{user_said}"
 
             import os
@@ -209,7 +197,6 @@ class MeetingEngine:
             )
             model = "deepseek-chat" if use_deepseek else "gpt-4o-mini"
 
-            # 浓缩会议
             resp = await client.chat.completions.create(
                 model=model,
                 messages=[
@@ -237,7 +224,6 @@ class MeetingEngine:
                 )
                 self._memory.add_meeting(summary)
 
-                # 更新 AI 对用户的整体理解
                 history_text = "\n".join(
                     f"- {ms.date}: {ms.summary} | Patterns: {ms.user_patterns}"
                     for ms in self._memory.meeting_summaries[:10]
@@ -253,24 +239,18 @@ class MeetingEngine:
                 )
                 self._memory.user_insights = resp2.choices[0].message.content or ""
 
-                # 通知前端保存记忆到 localStorage
                 if self.on_save_memory:
                     self.on_save_memory({
                         "type": "save_memory",
                         "memory": self._memory.to_dict(),
                     })
 
-                logger.info("Meeting memory saved and user insights updated")
+                # 会议摘要
+                detailed = await self._generate_meeting_summary(client, model, meeting_text)
+                if detailed and self.on_save_memory:
+                    self.on_save_memory({"type": "meeting_summary", "summary": detailed})
 
-                # 生成详细会议摘要发给前端（仅高级会员 — 前端控制显示）
-                detailed_summary = await self._generate_meeting_summary(
-                    client, model, meeting_text
-                )
-                if detailed_summary and self.on_save_memory:
-                    self.on_save_memory({
-                        "type": "meeting_summary",
-                        "summary": detailed_summary,
-                    })
+                logger.info("Meeting memory saved and user insights updated")
 
         except Exception as e:
             logger.error(f"Save meeting memory failed: {e}")
@@ -278,31 +258,19 @@ class MeetingEngine:
             self._context.reset()
 
     async def _generate_meeting_summary(self, client, model: str, meeting_text: str) -> str:
-        """生成详细的会议摘要。"""
         try:
             resp = await client.chat.completions.create(
                 model=model,
                 messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "Generate a professional meeting summary. Include:\n"
-                            "## Key Discussion Points\n"
-                            "- Main topics discussed\n\n"
-                            "## Questions Asked & Responses\n"
-                            "- Each question and how the user responded\n\n"
-                            "## Decisions & Action Items\n"
-                            "- Any decisions made or next steps\n\n"
-                            "## Performance Notes\n"
-                            "- User's communication strengths\n"
-                            "- Areas for improvement\n\n"
-                            "Use markdown formatting. Match the meeting's language."
-                        ),
-                    },
+                    {"role": "system", "content": (
+                        "Generate a professional meeting summary. Include:\n"
+                        "## Key Discussion Points\n## Questions Asked & Responses\n"
+                        "## Decisions & Action Items\n## Performance Notes\n"
+                        "Use markdown. Match the meeting's language."
+                    )},
                     {"role": "user", "content": meeting_text[:6000]},
                 ],
-                max_tokens=1000,
-                temperature=0.2,
+                max_tokens=1000, temperature=0.2,
             )
             return resp.choices[0].message.content or ""
         except Exception as e:
@@ -340,11 +308,11 @@ class MeetingEngine:
             logger.error(f"Mic audio error: {e}")
 
     # ═══════════════════════════════════════════════════════════════════
-    # Deepgram 转写回调
+    # Deepgram 转写回调 — 和初版完全一样的逻辑，只把规则检测换成 LLM
     # ═══════════════════════════════════════════════════════════════════
 
     def _on_system_transcript(self, result: dict):
-        """系统音频转写 → 字幕 + 累积 + 延迟检测。"""
+        """系统音频转写 → 字幕 + 问题检测（LLM）。"""
         text = result.get("text", "")
         is_final = result.get("is_final", False)
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
@@ -359,83 +327,54 @@ class MeetingEngine:
                 "speaker": "other",
             })
 
-        if not is_final or len(text.strip()) < 5:
-            return
+        # 问题检测 — 和初版一样的累积逻辑，只是检测方式换成 LLM
+        if is_final and self._detector:
+            now = time.time()
+            if now - self._last_system_final_time < self._CONTEXT_WINDOW:
+                self._recent_system_text = (self._recent_system_text + " " + text).strip()
+            else:
+                self._recent_system_text = text
+            self._last_system_final_time = now
 
-        # 累积
-        self._recent_system_text = (self._recent_system_text + " " + text).strip()
-        logger.info(f"[Transcript] final: '{text[:50]}' | total: {len(self._recent_system_text)} chars")
+            # 异步 LLM 检测（不阻塞转写回调）
+            accumulated = self._recent_system_text
+            if self._loop and len(accumulated) > 20:
+                self._loop.call_soon_threadsafe(
+                    asyncio.ensure_future,
+                    self._detect_and_respond(accumulated),
+                )
 
-        # 取消之前的待检测任务，重新计时3秒
-        if self._pending_detect and not self._pending_detect.done():
-            self._pending_detect.cancel()
-        if self._loop:
-            self._pending_detect = asyncio.ensure_future(self._delayed_detect())
-
-    async def _delayed_detect(self):
-        """等3秒没有新 final → 对方说完了 → 检测。"""
-        await asyncio.sleep(3.0)
-        text = self._recent_system_text.strip()
-        if not text or len(text) < 20 or text == self._last_checked_text:
-            return
-        self._last_checked_text = text
-        logger.info(f"[Detect] Speaker stopped. Checking {len(text)} chars: '{text[:80]}...'")
-        await self._detect_and_answer(text)
-
-    def _on_utterance_end(self):
-        """Deepgram UtteranceEnd（如果收到就立即检测，不等计时器）。"""
-        text = self._recent_system_text.strip()
-        if not text or len(text) < 20 or text == self._last_checked_text:
-            return
-        self._last_checked_text = text
-        # 取消延迟检测，直接检测
-        if self._pending_detect and not self._pending_detect.done():
-            self._pending_detect.cancel()
-        logger.info(f"[UtteranceEnd] Checking {len(text)} chars: '{text[:80]}...'")
-        if self._loop:
-            asyncio.ensure_future(self._detect_and_answer(text))
-
-    async def _detect_and_answer(self, text: str):
-        """LLM 判断完整文本是否需要回应。"""
+    async def _detect_and_respond(self, text: str):
+        """LLM 判断是否是问题，是的话立即生成回答。"""
         result = await self._detector.detect_with_llm(text)
+
         if result["is_question"]:
-            self._fire_answer(text, result["question_type"])
-        else:
-            logger.info(f"[Detect] Not a question: '{text[:60]}...'")
+            question_type = result["question_type"]
+            logger.info(f"[Question] type={question_type}: '{text[:60]}...'")
 
-    def _fire_answer(self, text: str, question_type: str):
-        """确认是问题 → 通知前端 + 生成 AI 回答。"""
-        logger.info(f"[Answer] Generating: type={question_type}, text='{text[:60]}...'")
+            self._context.add_question(text, question_type)
 
-        self._context.add_question(text, question_type)
+            if self.on_question_detected:
+                self.on_question_detected({
+                    "type": "question_detected",
+                    "question": text,
+                    "question_type": question_type,
+                    "confidence": result["confidence"],
+                })
 
-        if self.on_question_detected:
-            self.on_question_detected({
-                "type": "question_detected",
-                "question": text,
-                "question_type": question_type,
-                "confidence": 1.0,
-            })
-
-        if self._loop:
-            self._loop.call_soon_threadsafe(
-                asyncio.ensure_future,
-                self._generate_answer(text, question_type),
-            )
-        self._recent_system_text = ""  # 清空，避免重复回答
+            await self._generate_answer(text, question_type)
+            self._recent_system_text = ""
 
     def _on_mic_transcript(self, result: dict):
-        """麦克风转写 → 存入上下文（用户自己说的话）。"""
+        """麦克风转写 → 存入上下文。"""
         if not result.get("is_final"):
             return
 
         text = result.get("text", "")
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
 
-        # 存入上下文 — AI 会知道用户说了什么
         self._context.add_user_utterance(text)
 
-        # 也发送到前端做会议记录
         if self.on_transcription:
             self.on_transcription({
                 "type": "transcription",
@@ -459,7 +398,6 @@ class MeetingEngine:
             ):
                 if self.on_answer_token:
                     self.on_answer_token({"type": "answer", "token": token})
-                # 同步更新上下文里的回答
                 self._context.update_answer(token)
         except Exception as e:
             logger.error(f"Answer generation error: {e}")
