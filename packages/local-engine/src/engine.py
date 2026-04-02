@@ -63,6 +63,7 @@ class MeetingEngine:
         self._last_system_final_time = 0.0
         self._CONTEXT_WINDOW = 8.0
         self._detecting = False
+        self._cooldown_until = 0.0  # 回答后冷却10秒，防止重复
 
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
@@ -347,7 +348,7 @@ class MeetingEngine:
 
             # 异步 LLM 检测（防并发：正在检测时跳过）
             accumulated = self._recent_system_text
-            if self._loop and len(accumulated) > 20 and not self._detecting:
+            if self._loop and len(accumulated) > 20 and not self._detecting and time.time() > self._cooldown_until:
                 self._detecting = True
                 self._loop.call_soon_threadsafe(
                     asyncio.ensure_future,
@@ -362,6 +363,8 @@ class MeetingEngine:
             self._detecting = False
 
         if result["is_question"]:
+            # 设冷却：回答生成期间 + 之后10秒不再触发
+            self._cooldown_until = time.time() + 30
             question_type = result["question_type"]
             logger.info(f"[Question] type={question_type}: '{text[:60]}...'")
 
@@ -377,6 +380,8 @@ class MeetingEngine:
 
             await self._generate_answer(text, question_type)
             self._recent_system_text = ""
+            # 回答完成后，冷却10秒再允许下一个问题
+            self._cooldown_until = time.time() + 10
 
     def _on_mic_transcript(self, result: dict):
         """麦克风转写 → 去重后存入上下文。"""
