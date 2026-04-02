@@ -287,7 +287,7 @@ export default function Meeting() {
       </div>
 
       {/* Right: How it works */}
-      <div className="w-80 flex-shrink-0 space-y-4 self-stretch flex flex-col justify-center">
+      <div className="w-80 flex-shrink-0 flex flex-col justify-center gap-4">
         <div className="bg-imeet-panel rounded-[10px] p-5 border border-imeet-border">
           <h3 className="text-sm font-semibold text-imeet-gold mb-4">How Voxclar Works</h3>
           <div className="space-y-4">
@@ -308,12 +308,11 @@ export default function Meeting() {
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="bg-white/[0.02] rounded-[10px] p-4 border border-imeet-border">
-          <p className="text-xs text-imeet-text-muted leading-relaxed">
-            <span className="text-imeet-gold font-medium">Tip:</span> Upload your resume in Profile and prep notes here for the best AI-generated answers tailored to your experience.
-          </p>
+          <div className="pt-3 mt-3 border-t border-white/[0.06]">
+            <p className="text-xs text-imeet-text-muted leading-relaxed">
+              <span className="text-imeet-gold font-medium">Tip:</span> Upload your resume in Profile and prep notes here for the best AI answers.
+            </p>
+          </div>
         </div>
       </div>
     </div>
