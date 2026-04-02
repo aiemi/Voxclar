@@ -214,7 +214,7 @@ export default function Meeting() {
 
   // 未录制 — 新会议设置
   return (
-    <div className="h-full flex gap-6 p-2">
+    <div className="h-full flex gap-6 items-center">
       {/* Left: Setup Form */}
       <div className="flex-1">
         <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border space-y-4">
