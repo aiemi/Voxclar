@@ -84,22 +84,16 @@ export default function CaptionOverlay() {
         <span className="text-[10px] text-amber-400/50 font-medium tracking-wider">Voxclar</span>
 
         <div className="flex items-center gap-1 relative" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-          {/* 透明度快捷按钮 */}
           {showSettings && (
-            <div className="flex items-center gap-0.5 mr-1">
-              {[0.3, 0.5, 0.7, 0.85, 1.0].map((v) => (
-                <button
-                  key={v}
-                  onClick={() => changeOpacity(v)}
-                  className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
-                    Math.abs(opacity - v) < 0.05
-                      ? 'bg-amber-500/30 text-amber-400'
-                      : 'text-white/40 hover:bg-white/15 hover:text-white/70'
-                  }`}
-                >
-                  {Math.round(v * 100)}%
-                </button>
-              ))}
+            <div className="flex items-center gap-2 mr-2">
+              <span className="text-[10px] text-white/40">{Math.round(opacity * 100)}%</span>
+              <input
+                type="range" min="10" max="100" step="5"
+                value={Math.round(opacity * 100)}
+                onChange={(e) => changeOpacity(parseInt(e.target.value) / 100)}
+                className="w-24 h-1 appearance-none bg-white/20 rounded-full cursor-pointer accent-amber-400"
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              />
             </div>
           )}
           {/* 设置按钮 — 大点击区域 */}

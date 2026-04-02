@@ -49,14 +49,15 @@ class SmartQuestionDetector:
 
     async def detect_with_llm(self, text: str) -> dict:
         """LLM 判断完整文本是否需要回应。"""
-        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
+        # 问题检测用最便宜的模型 — DeepSeek 优先
+        api_key = os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")
         if not api_key:
             return {"is_question": False, "question_type": "general", "confidence": 0}
 
         try:
             from openai import AsyncOpenAI
 
-            use_deepseek = not os.environ.get("OPENAI_API_KEY")
+            use_deepseek = bool(os.environ.get("DEEPSEEK_API_KEY"))
             client = AsyncOpenAI(
                 api_key=api_key,
                 base_url="https://api.deepseek.com" if use_deepseek else None,

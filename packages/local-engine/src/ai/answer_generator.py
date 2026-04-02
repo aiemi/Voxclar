@@ -26,17 +26,17 @@ async def generate_answer(
     openai_key = os.environ.get("OPENAI_API_KEY")
     deepseek_key = os.environ.get("DEEPSEEK_API_KEY")
 
-    # behavioral/technical → Claude（更擅长结构化回答）
-    # general → OpenAI（更快更便宜）
-    # fallback → DeepSeek
-    if claude_key and question_type in ("behavioral", "technical"):
+    # behavioral/technical → Claude（结构化回答最强）
+    # general → DeepSeek V3（最便宜最快）
+    # fallback chain: DeepSeek → OpenAI → Claude
+    if question_type in ("behavioral", "technical") and claude_key:
         async for token in _call_claude(system_prompt, user_message, claude_key):
-            yield token
-    elif openai_key:
-        async for token in _call_openai(system_prompt, user_message, openai_key):
             yield token
     elif deepseek_key:
         async for token in _call_deepseek(system_prompt, user_message, deepseek_key):
+            yield token
+    elif openai_key:
+        async for token in _call_openai(system_prompt, user_message, openai_key):
             yield token
     elif claude_key:
         async for token in _call_claude(system_prompt, user_message, claude_key):
