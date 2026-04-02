@@ -216,7 +216,7 @@ export default function Meeting() {
   return (
     <div className="h-full flex gap-6 items-center">
       {/* Left: Setup Form */}
-      <div className="flex-1">
+      <div className="flex-1 self-stretch flex flex-col justify-center">
         <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border space-y-4">
           <h2 className="text-lg font-bold text-imeet-gold">{t('meeting.new')}</h2>
 
@@ -287,7 +287,7 @@ export default function Meeting() {
       </div>
 
       {/* Right: How it works */}
-      <div className="w-80 flex-shrink-0 space-y-4">
+      <div className="w-80 flex-shrink-0 space-y-4 self-stretch flex flex-col justify-center">
         <div className="bg-imeet-panel rounded-[10px] p-5 border border-imeet-border">
           <h3 className="text-sm font-semibold text-imeet-gold mb-4">How Voxclar Works</h3>
           <div className="space-y-4">
