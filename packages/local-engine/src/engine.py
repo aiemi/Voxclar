@@ -59,9 +59,10 @@ class MeetingEngine:
         self._meeting_title = ""
         self._meeting_start_time = 0.0
         self._recent_system_text = ""
+        self._all_system_text = ""          # 整场会议的系统音频全文（用于 mic 去重）
         self._last_system_final_time = 0.0
         self._CONTEXT_WINDOW = 8.0
-        self._detecting = False             # 防并发：正在检测时不重复触发
+        self._detecting = False
 
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
@@ -165,6 +166,7 @@ class MeetingEngine:
                 asyncio.run_coroutine_threadsafe(self._mic_deepgram.disconnect(), self._loop)
             asyncio.run_coroutine_threadsafe(self._save_meeting_memory(), self._loop)
         self._recent_system_text = ""
+        self._all_system_text = ""
         logger.info("Meeting stopped")
 
     async def _save_meeting_memory(self):
@@ -337,6 +339,12 @@ class MeetingEngine:
                 self._recent_system_text = text
             self._last_system_final_time = now
 
+            # 追加到全文（用于 mic 回声去重）
+            self._all_system_text = (self._all_system_text + " " + text).strip()
+            # 只保留最近 2000 字符
+            if len(self._all_system_text) > 2000:
+                self._all_system_text = self._all_system_text[-2000:]
+
             # 异步 LLM 检测（防并发：正在检测时跳过）
             accumulated = self._recent_system_text
             if self._loop and len(accumulated) > 20 and not self._detecting:
@@ -379,12 +387,15 @@ class MeetingEngine:
         if len(text) < 5:
             return
 
-        # 回声去重：如果 mic 转写和最近的系统音频高度相似，说明是扬声器回声，丢弃
-        if self._recent_system_text:
+        # 回声去重：mic 转写如果在系统音频全文中出现过，就是扬声器回声
+        if self._all_system_text and len(text) > 10:
             from difflib import SequenceMatcher
-            similarity = SequenceMatcher(None, text.lower(), self._recent_system_text.lower()[-len(text)-50:]).ratio()
-            if similarity > 0.5:
-                logger.debug(f"[Mic] Echo rejected (similarity={similarity:.2f}): '{text[:40]}...'")
+            # 和全文最后 500 字符比较
+            ref = self._all_system_text[-500:].lower()
+            mic = text.lower()
+            similarity = SequenceMatcher(None, mic, ref).ratio()
+            if similarity > 0.4:
+                logger.debug(f"[Mic] Echo rejected (sim={similarity:.2f}): '{text[:40]}...'")
                 return
 
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
