@@ -6,16 +6,16 @@ module.exports = {
       colors: {
         imeet: {
           black: '#000000',
-          panel: '#1A1B1E',
-          card: '#2C2E33',
-          gold: '#FFD700',
-          'gold-hover': '#FFE44D',
+          panel: '#1A1A1A',
+          card: '#232323',
+          gold: '#FFDD02',
+          'gold-hover': '#FFE84D',
           'gold-dim': '#B8960F',
-          border: '#3A3B3F',
-          'border-light': '#56595F',
+          border: 'rgba(255, 255, 255, 0.12)',
+          'border-light': 'rgba(255, 255, 255, 0.2)',
           'text-primary': '#FFFFFF',
-          'text-secondary': '#A0A0A0',
-          'text-muted': '#6B6B6B',
+          'text-secondary': 'rgba(255, 255, 255, 0.6)',
+          'text-muted': 'rgba(255, 255, 255, 0.35)',
         },
       },
       fontFamily: {
@@ -24,6 +24,10 @@ module.exports = {
       borderRadius: {
         'imeet': '8px',
         'imeet-lg': '12px',
+        'imeet-xl': '20px',
+      },
+      backdropBlur: {
+        'glass': '10px',
       },
     },
   },

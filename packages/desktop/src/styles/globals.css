@@ -17,97 +17,93 @@
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #3A3B3F;
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #56595F;
-  }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
 
-  /* Drag region for frameless window */
-  .drag-region {
-    -webkit-app-region: drag;
-  }
-  .no-drag {
-    -webkit-app-region: no-drag;
-  }
+  /* Drag region */
+  .drag-region { -webkit-app-region: drag; }
+  .no-drag { -webkit-app-region: no-drag; }
 }
 
 @layer components {
+  /* Glass panel — frosted glass effect */
   .glass-panel {
-    background: rgba(26, 27, 30, 0.85);
-    backdrop-filter: blur(20px);
-    border: 1px solid #3A3B3F;
-    border-radius: 12px;
+    background: rgba(26, 26, 26, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+  }
+
+  /* Card — 不对称圆角风格 */
+  .card {
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px 20px 4px 20px;
+    padding: 20px;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+  }
+  .card:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  /* Card variants — different corner cuts */
+  .card-alt {
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px 4px 20px 20px;
+    padding: 20px;
+  }
+  .card-flat {
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 20px;
   }
 
   .btn-gold {
-    @apply bg-imeet-gold text-black font-semibold px-6 py-2 rounded-imeet
-           hover:bg-imeet-gold-hover transition-colors duration-200
-           active:scale-95;
+    @apply bg-imeet-gold text-black font-semibold px-6 py-2.5 rounded-[8px]
+           hover:bg-imeet-gold-hover transition-all duration-300
+           active:scale-[0.97];
   }
 
   .btn-outline {
-    @apply border border-imeet-border text-imeet-text-secondary px-6 py-2 rounded-imeet
-           hover:border-imeet-gold hover:text-imeet-gold transition-colors duration-200;
+    @apply border border-imeet-border text-imeet-text-secondary px-6 py-2.5 rounded-[8px]
+           hover:border-imeet-gold hover:text-imeet-gold transition-all duration-300;
   }
 
   .input-field {
-    @apply bg-imeet-card border border-imeet-border rounded-imeet px-4 py-2.5
+    @apply bg-imeet-card border border-imeet-border rounded-[8px] px-4 py-2.5
            text-white placeholder:text-imeet-text-muted
-           focus:border-imeet-gold focus:outline-none transition-colors duration-200;
-  }
-
-  .card {
-    @apply bg-imeet-panel border border-imeet-border rounded-imeet-lg p-4;
+           focus:border-imeet-gold focus:outline-none transition-all duration-300;
   }
 
   .nav-item {
-    @apply flex items-center gap-3 px-4 py-3 rounded-imeet text-imeet-text-secondary
-           hover:text-imeet-gold hover:bg-imeet-card transition-colors duration-200 cursor-pointer;
+    @apply flex items-center gap-3 px-4 py-3 rounded-[8px] text-imeet-text-secondary
+           hover:text-imeet-gold hover:bg-white/[0.05] transition-all duration-200 cursor-pointer;
   }
-
   .nav-item-active {
-    @apply text-imeet-gold bg-imeet-card;
+    @apply text-imeet-gold bg-white/[0.05];
   }
 }
 
-/* Tiptap Editor Dark Theme */
-.tiptap {
-  outline: none;
-  color: #e0e0e0;
-  font-size: 14px;
-  line-height: 1.7;
-}
-.tiptap h1, .tiptap h2, .tiptap h3 {
-  color: #FFD700;
-  margin: 16px 0 8px;
-}
-.tiptap h2 { font-size: 18px; border-bottom: 1px solid #3A3B3F; padding-bottom: 6px; }
+/* Tiptap Editor */
+.tiptap { outline: none; color: #e0e0e0; font-size: 14px; line-height: 1.7; }
+.tiptap h1, .tiptap h2, .tiptap h3 { color: #FFDD02; margin: 16px 0 8px; }
+.tiptap h2 { font-size: 18px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; }
 .tiptap p { margin: 6px 0; }
 .tiptap strong { color: #fff; }
 .tiptap blockquote {
-  border-left: 3px solid #FFD700;
-  padding: 8px 14px;
-  margin: 12px 0;
-  background: rgba(255, 215, 0, 0.05);
+  border-left: 3px solid #FFDD02;
+  padding: 8px 14px; margin: 12px 0;
+  background: rgba(255, 221, 2, 0.05);
   border-radius: 4px;
 }
-.tiptap mark { background: rgba(255, 215, 0, 0.3); color: #fff; padding: 0 3px; border-radius: 2px; }
+.tiptap mark { background: rgba(255, 221, 2, 0.3); color: #fff; padding: 0 3px; border-radius: 2px; }
 .tiptap ul, .tiptap ol { margin: 8px 0 8px 20px; }
 .tiptap li { margin: 4px 0; }
 .tiptap p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  color: #555;
-  pointer-events: none;
-  height: 0;
+  content: attr(data-placeholder); float: left; color: #555; pointer-events: none; height: 0;
 }
