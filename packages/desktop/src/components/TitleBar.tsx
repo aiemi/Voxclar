@@ -6,11 +6,11 @@ const api = (window as unknown as { electronAPI?: {
 
 export default function TitleBar() {
   return (
-    <div className="drag-region h-8 bg-imeet-panel border-b border-imeet-border flex items-center justify-between px-2 flex-shrink-0">
+    <div className="drag-region h-8 bg-transparent border-b border-white/[0.04] flex items-center justify-between px-2 flex-shrink-0">
       {/* macOS 左侧留空给交通灯按钮 */}
       <div className="w-20" />
 
-      <span className="text-xs text-imeet-text-muted select-none">Voxclar</span>
+      <span className="text-[11px] text-white/20 select-none font-medium tracking-wide">Voxclar</span>
 
       {/* Windows 风格窗口按钮（macOS 上隐藏，用原生交通灯） */}
       <div className="no-drag flex items-center gap-1">
