@@ -24,6 +24,15 @@ function formatDateLong(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+function formatAnswer(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#FFD700">$1</strong>')
+    .replace(/^#{1,3}\s+(.+)$/gm, '<h3>$1</h3>')
+    .replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br>')
+}
+
 /** 把 MeetingRecord 转成编辑器初始 HTML */
 function recordToHtml(record: MeetingRecord, isPremium: boolean): string {
   const parts: string[] = []
@@ -38,13 +47,13 @@ function recordToHtml(record: MeetingRecord, isPremium: boolean): string {
   if (record.answers.length > 0) {
     parts.push(`<h2>AI-Generated Answers</h2>`)
     for (const a of record.answers) {
-      parts.push(`<blockquote><p><strong>Q (${a.question_type}):</strong> ${a.question_text}</p><p>${a.answer_text}</p></blockquote>`)
+      parts.push(`<blockquote><p><strong>Q (${a.question_type}):</strong> ${a.question_text}</p><p>${formatAnswer(a.answer_text)}</p></blockquote>`)
     }
   }
 
   if (isPremium && record.summary) {
     parts.push(`<h2>AI Meeting Summary</h2>`)
-    parts.push(`<p>${record.summary.replace(/\n/g, '<br>')}</p>`)
+    parts.push(formatAnswer(record.summary))
   }
 
   return parts.join('')
