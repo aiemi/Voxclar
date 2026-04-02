@@ -11,7 +11,7 @@ import type { MeetingRecord } from '@/types'
 import {
   Clock, MessageSquare, FileText, Lock, Copy, CheckCircle,
   FileDown, Bold, Italic, List, ListOrdered, AlignLeft, AlignCenter,
-  Heading2, Highlighter, Undo, Redo, Eye, Pencil,
+  Heading2, Highlighter, Undo, Redo, Eye, Pencil, Trash2,
 } from 'lucide-react'
 
 const electronAPI = (window as unknown as { electronAPI?: {
@@ -80,10 +80,21 @@ export default function MeetingRecordPage() {
   const navigate = useNavigate()
   const { lastRecord } = useMeetingStore()
   const user = useAuthStore((s) => s.user)
-  const [records] = useState<MeetingRecord[]>(loadRecords)
+  const [records, setRecords] = useState<MeetingRecord[]>(loadRecords)
   const [selectedId, setSelectedId] = useState<string | null>(lastRecord?.meeting.id || records[0]?.meeting.id || null)
   const [copied, setCopied] = useState(false)
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
+
+  const deleteRecord = (id: string) => {
+    const updated = records.filter((r) => r.meeting.id !== id)
+    setRecords(updated)
+    try {
+      localStorage.setItem('voxclar_meeting_records', JSON.stringify(updated))
+    } catch {}
+    if (selectedId === id) {
+      setSelectedId(updated[0]?.meeting.id || null)
+    }
+  }
 
   const isPremium = user?.subscription_tier && user.subscription_tier !== 'free'
   const record = selectedId
@@ -129,21 +140,27 @@ export default function MeetingRecordPage() {
         <div className="flex-1 overflow-y-auto space-y-1.5">
           {records.length === 0 && <p className="text-xs text-imeet-text-muted">No meetings yet</p>}
           {records.map((r) => (
-            <button
+            <div
               key={r.meeting.id}
-              onClick={() => setSelectedId(r.meeting.id)}
-              className={`w-full text-left p-3 rounded-lg transition-all text-sm ${
+              className={`relative group p-3 rounded-lg transition-all text-sm cursor-pointer ${
                 selectedId === r.meeting.id
                   ? 'bg-imeet-gold/10 border border-imeet-gold/30'
                   : 'bg-imeet-panel border border-imeet-border hover:border-imeet-border-light'
               }`}
+              onClick={() => setSelectedId(r.meeting.id)}
             >
-              <p className="font-medium truncate">{r.meeting.title || 'Untitled'}</p>
+              <p className="font-medium truncate pr-6">{r.meeting.title || 'Untitled'}</p>
               <div className="flex items-center gap-2 mt-1 text-xs text-imeet-text-muted">
                 <Clock size={10} />
                 <span>{formatDuration(r.meeting.duration_seconds)}</span>
               </div>
-            </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); deleteRecord(r.meeting.id) }}
+                className="absolute top-2.5 right-2.5 opacity-0 group-hover:opacity-100 text-white/20 hover:text-red-400 transition-all"
+              >
+                <Trash2 size={13} />
+              </button>
+            </div>
           ))}
         </div>
       </div>

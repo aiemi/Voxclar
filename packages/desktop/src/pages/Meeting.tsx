@@ -249,7 +249,7 @@ export default function Meeting() {
           value={prepNotes}
           onChange={(e) => setPrepNotes(e.target.value)}
           placeholder={t('meeting.prep_notes')}
-          className="input-field w-full h-24 resize-none text-sm"
+          className="input-field w-full h-[118px] resize-none text-sm"
         />
 
         {/* Prep files */}
