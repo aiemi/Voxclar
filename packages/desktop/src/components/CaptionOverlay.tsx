@@ -25,6 +25,8 @@ function formatAnswer(text: string): string {
 export default function CaptionOverlay() {
   const [confirmed, setConfirmed] = useState('')
   const [pending, setPending] = useState('')
+  const [currentSpeaker, setCurrentSpeaker] = useState('')
+  const lastSpeakerRef = useRef('')
   const [answer, setAnswer] = useState<{ text: string; type: string } | null>(null)
   const [opacity, setOpacity] = useState(0.88)
   const [showSettings, setShowSettings] = useState(false)
@@ -43,10 +45,22 @@ export default function CaptionOverlay() {
       }
 
       if (data.transcript) {
-        if (data.transcript.is_final) {
+        const speaker = data.transcript.speaker || 'other'
+
+        // 说话人切换时，换行 + 显示新说话人标签
+        if (speaker !== lastSpeakerRef.current && data.transcript.is_final) {
+          lastSpeakerRef.current = speaker
+          setCurrentSpeaker(speaker)
+          setConfirmed((prev) => {
+            const label = speaker !== 'other' ? `\n[${speaker}] ` : '\n'
+            const combined = prev ? `${prev}${label}${data.transcript!.text}` : data.transcript!.text
+            return combined.length > 600 ? combined.slice(-600) : combined
+          })
+          setPending('')
+        } else if (data.transcript.is_final) {
           setConfirmed((prev) => {
             const combined = prev ? `${prev} ${data.transcript!.text}` : data.transcript!.text
-            return combined.length > 500 ? combined.slice(-500) : combined
+            return combined.length > 600 ? combined.slice(-600) : combined
           })
           setPending('')
         } else {
@@ -121,7 +135,7 @@ export default function CaptionOverlay() {
         >
           {displayText ? (
             <p className="text-[15px] leading-relaxed">
-              <span className="text-white/90">{confirmed}</span>
+              <span className="text-white/90 whitespace-pre-wrap">{confirmed}</span>
               {pending && <span className="text-white/50">{` ${pending}`}</span>}
             </p>
           ) : (

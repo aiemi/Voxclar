@@ -42,7 +42,11 @@ export function useEngine() {
           // 系统音频直接推到字幕窗口 — 不经过 store 累积
           if (msg.speaker === 'other') {
             electronAPI?.caption.update({
-              transcript: { text: msg.text, speaker: 'other', is_final: msg.is_final },
+              transcript: {
+                text: msg.text,
+                speaker: (msg.speaker_label as string) || 'other',
+                is_final: msg.is_final,
+              },
               answer: null,
             })
           }

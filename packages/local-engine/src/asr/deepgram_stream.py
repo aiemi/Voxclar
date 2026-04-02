@@ -75,6 +75,7 @@ class DeepgramStream:
             f"&interim_results=true"
             f"&endpointing=1500"
             f"&vad_events=true"
+            f"&diarize=true"
             f"&encoding=linear16"
             f"&sample_rate={self.sample_rate}"
             f"&channels=1"
@@ -170,11 +171,19 @@ class DeepgramStream:
             or self.language
         )
 
+        # 提取说话人信息（diarization）
+        speaker = None
+        words = alt.get("words", [])
+        if words:
+            # 取第一个词的 speaker（一个 final 通常是同一个人说的）
+            speaker = words[0].get("speaker")
+
         result = {
             "text": text,
             "is_final": is_final or speech_final,
             "language": language or "en",
             "confidence": alt.get("confidence", 0),
+            "speaker_id": speaker,  # 0, 1, 2... 或 None
         }
 
         if self.on_transcript:

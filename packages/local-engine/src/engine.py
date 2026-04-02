@@ -321,6 +321,10 @@ class MeetingEngine:
         is_final = result.get("is_final", False)
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
 
+        # speaker_id: Deepgram diarization (0, 1, 2...)
+        speaker_id = result.get("speaker_id")
+        speaker_label = f"Speaker {speaker_id}" if speaker_id is not None else "other"
+
         if self.on_transcription:
             self.on_transcription({
                 "type": "transcription",
@@ -329,6 +333,8 @@ class MeetingEngine:
                 "language": result.get("language", self._context.language),
                 "timestamp_ms": timestamp_ms,
                 "speaker": "other",
+                "speaker_id": speaker_id,
+                "speaker_label": speaker_label,
             })
 
         # 问题检测 — 和初版一样的累积逻辑，只是检测方式换成 LLM
