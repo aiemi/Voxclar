@@ -31,13 +31,13 @@ export default function Sidebar() {
   }[engineStatus]
 
   return (
-    <div className="w-56 h-full bg-[#0a0a0a] border-r border-white/[0.06] flex flex-col">
+    <div className="w-56 h-full bg-[#0a0a0a]/90 backdrop-blur-xl border-r border-white/[0.06] flex flex-col">
       {/* macOS 交通灯 */}
       <div className="drag-region h-10 flex-shrink-0" />
 
       {/* Logo */}
       <div className="px-5 pb-5">
-        <h1 className="text-xl font-bold tracking-tight">
+        <h1 className="text-2xl font-bold font-brand">
           <span className="text-imeet-gold">Vox</span>
           <span className="text-white">clar</span>
         </h1>

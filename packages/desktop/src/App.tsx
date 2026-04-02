@@ -76,7 +76,7 @@ function LoginPage() {
         <div className="w-[420px]">
           {/* Logo */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold mb-2">
+            <h1 className="text-4xl font-bold mb-2 font-brand">
               <span className="text-imeet-gold">Vox</span><span className="text-white">clar</span>
             </h1>
             <p className="text-imeet-text-muted text-sm">
@@ -85,7 +85,7 @@ function LoginPage() {
           </div>
 
           {/* Card */}
-          <div className="bg-[#1a1a1a] rounded-[20px_20px_4px_20px] p-8 border border-white/[0.08] shadow-[0_4px_6px_rgba(0,0,0,0.1)]">
+          <div className="bg-[#1a1a1a]/80 backdrop-blur-2xl rounded-[20px_20px_4px_20px] p-8 border border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
             <h2 className="text-lg font-semibold text-center mb-6">
               {isRegister ? t('auth.register') : t('auth.login')}
             </h2>

@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useEngineStore } from '@/stores/engineStore'
 import { Mic, Activity, Play, Zap, Shield, Globe, Timer, FileText, Brain } from 'lucide-react'
 import clsx from 'clsx'
+import AnimatedText from '@/components/AnimatedText'
 
 export default function Dashboard() {
   const { t } = useTranslation()
@@ -26,7 +27,8 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-2xl font-bold">
-              {t('dashboard.welcome')}, <span className="text-imeet-gold">{user?.username || 'User'}</span>
+              <AnimatedText text={`${t('dashboard.welcome')}, `} />
+              <AnimatedText text={user?.username || 'User'} className="text-imeet-gold" />
             </h2>
             <p className="text-white/[0.35] text-sm mt-1">
               {user?.subscription_tier ? `${user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)} Plan` : 'Free Plan'}

@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Amiri — Brand serif font */
+@font-face { font-family: 'Amiri'; font-weight: 400; src: url('@/assets/fonts/Amiri-Regular-5.ttf') format('truetype'); }
+@font-face { font-family: 'Amiri'; font-weight: 700; src: url('@/assets/fonts/Amiri-Bold-2.ttf') format('truetype'); }
+
 @layer base {
   * {
     margin: 0;
@@ -35,6 +39,19 @@
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 20px;
+  }
+
+  /* Strong glass — heavier blur for modals/overlays */
+  .glass-strong {
+    background: rgba(26, 26, 26, 0.7);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+  }
+
+  /* Brand font utility */
+  .font-brand {
+    font-family: 'Amiri', serif;
   }
 
   /* Card — 不对称圆角风格 */
