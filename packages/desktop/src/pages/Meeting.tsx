@@ -7,6 +7,15 @@ import type { MeetingType } from '@/types'
 import { Play, Square, Clock, ThumbsUp, ThumbsDown, Copy, MonitorUp, Subtitles, MessageSquare, Upload, File, X, Loader2 } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 
+function formatAnswer(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<span style="color:#FFD700;font-weight:600">$1</span>')
+    .replace(/^#{1,3}\s+(.+)$/gm, '<div style="color:#FFD700;font-weight:600;margin-top:6px">$1</div>')
+    .replace(/^[-•]\s+/gm, '  · ')
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(255,215,0,0.1);color:#FFD700;padding:1px 4px;border-radius:3px;font-size:12px">$1</code>')
+    .replace(/\n/g, '<br>')
+}
+
 const electronAPI = (window as unknown as { electronAPI?: {
   caption: { show: () => void; hide: () => void; toggle: () => Promise<boolean>; update: (data: unknown) => void }
 } }).electronAPI
@@ -301,7 +310,7 @@ export default function Meeting() {
                     }`}>{a.question_type}</span>
                     <p className="text-xs text-imeet-text-muted truncate flex-1">{a.question_text}</p>
                   </div>
-                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{a.answer_text || '...'}</p>
+                  <div className="text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: formatAnswer(a.answer_text || '...') }} />
                   <div className="flex gap-3 mt-3 pt-2 border-t border-white/5">
                     <button className="text-imeet-text-muted hover:text-green-400 transition-colors"><ThumbsUp size={13} /></button>
                     <button className="text-imeet-text-muted hover:text-red-400 transition-colors"><ThumbsDown size={13} /></button>

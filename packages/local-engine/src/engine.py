@@ -61,6 +61,7 @@ class MeetingEngine:
         self._recent_system_text = ""
         self._last_system_final_time = 0.0
         self._CONTEXT_WINDOW = 8.0
+        self._detecting = False             # 防并发：正在检测时不重复触发
 
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
@@ -336,9 +337,10 @@ class MeetingEngine:
                 self._recent_system_text = text
             self._last_system_final_time = now
 
-            # 异步 LLM 检测（不阻塞转写回调）
+            # 异步 LLM 检测（防并发：正在检测时跳过）
             accumulated = self._recent_system_text
-            if self._loop and len(accumulated) > 20:
+            if self._loop and len(accumulated) > 20 and not self._detecting:
+                self._detecting = True
                 self._loop.call_soon_threadsafe(
                     asyncio.ensure_future,
                     self._detect_and_respond(accumulated),
@@ -346,7 +348,10 @@ class MeetingEngine:
 
     async def _detect_and_respond(self, text: str):
         """LLM 判断是否是问题，是的话立即生成回答。"""
-        result = await self._detector.detect_with_llm(text)
+        try:
+            result = await self._detector.detect_with_llm(text)
+        finally:
+            self._detecting = False
 
         if result["is_question"]:
             question_type = result["question_type"]

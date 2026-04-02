@@ -12,6 +12,16 @@ const electronAPI = (window as unknown as { electronAPI?: {
   }
 } }).electronAPI
 
+/** 把 AI 回答中的 markdown 转成高亮 HTML */
+function formatAnswer(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '<span style="color:#FFD700;font-weight:600">$1</span>')
+    .replace(/^#{1,3}\s+(.+)$/gm, '<div style="color:#FFD700;font-weight:600;margin-top:6px">$1</div>')
+    .replace(/^[-•]\s+/gm, '  · ')
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(255,215,0,0.1);color:#FFD700;padding:1px 4px;border-radius:3px;font-size:12px">$1</code>')
+    .replace(/\n/g, '<br>')
+}
+
 export default function CaptionOverlay() {
   const [confirmed, setConfirmed] = useState('')
   const [pending, setPending] = useState('')
@@ -135,7 +145,7 @@ export default function CaptionOverlay() {
               <span className="text-[9px] bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded font-medium">AI</span>
               <span className="text-[9px] text-white/40 uppercase">{answer.type}</span>
             </div>
-            <p className="text-[13px] text-white/85 leading-relaxed whitespace-pre-wrap">{answer.text}</p>
+            <div className="text-[13px] text-white/85 leading-relaxed" dangerouslySetInnerHTML={{ __html: formatAnswer(answer.text) }} />
           </div>
         )}
       </div>
