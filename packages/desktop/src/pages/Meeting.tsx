@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useEngine } from '@/hooks/useEngine'
 import { useMeetingStore } from '@/stores/meetingStore'
 import type { MeetingType } from '@/types'
-import { Play, Square, Clock, MonitorUp, Upload, File, X, Loader2 } from 'lucide-react'
+import { Play, Square, Clock, MonitorUp, Upload, File, X, Loader2, Shield, Zap, Brain, Mic, MessageSquare } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 
 const electronAPI = (window as unknown as { electronAPI?: {
@@ -130,49 +130,83 @@ export default function Meeting() {
     return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
   }
 
-  if (isRecording) {
-    // 录制中 — 简洁的控制面板，全部内容在字幕窗口
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="bg-imeet-panel rounded-[10px] p-8 border border-imeet-border w-96 text-center">
-          <h3 className="font-semibold text-imeet-gold mb-1 text-lg">{title || 'Meeting'}</h3>
-          <p className="text-xs text-imeet-text-muted mb-6 capitalize">{meetingType.replace('_', ' ')}</p>
+  const { answers } = useMeetingStore()
 
-          {/* Timer */}
-          <div className="flex items-center justify-center gap-3 mb-8">
-            <Clock size={20} className="text-imeet-gold" />
-            <span className="font-mono text-3xl text-imeet-gold">{formatTime(elapsedSeconds)}</span>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-              <span className="text-xs text-red-400 font-medium">LIVE</span>
+  if (isRecording) {
+    return (
+      <div className="h-full flex flex-col gap-5">
+        {/* Top: Control Card */}
+        <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-imeet-gold text-lg">{title || 'Meeting'}</h3>
+              <p className="text-xs text-imeet-text-muted capitalize">{meetingType.replace('_', ' ')}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Clock size={18} className="text-imeet-gold" />
+                <span className="font-mono text-2xl text-imeet-gold">{formatTime(elapsedSeconds)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-xs text-red-400 font-medium">LIVE</span>
+              </div>
             </div>
           </div>
-
-          {/* Controls */}
-          <div className="flex gap-3">
+          <div className="flex gap-3 mt-4">
             <button
               onClick={handleStop}
-              className="flex-1 py-3 rounded-lg border-2 border-red-500/50 text-red-400 font-semibold flex items-center justify-center gap-2 hover:bg-red-500/10 transition-colors"
+              className="flex-1 py-2.5 rounded-lg border-2 border-red-500/50 text-red-400 font-semibold flex items-center justify-center gap-2 hover:bg-red-500/10 transition-colors"
             >
-              <Square size={16} />
-              End Meeting
+              <Square size={14} /> End Meeting
             </button>
             <button
               onClick={toggleCaption}
-              className={`px-4 py-3 rounded-lg border-2 transition-all ${
+              className={`px-4 py-2.5 rounded-lg border-2 transition-all ${
                 captionVisible
                   ? 'border-imeet-gold text-imeet-gold bg-imeet-gold/10'
                   : 'border-imeet-border text-imeet-text-muted hover:border-imeet-gold'
               }`}
               title="Toggle Caption Window"
             >
-              <MonitorUp size={18} />
+              <MonitorUp size={16} />
             </button>
           </div>
+        </div>
 
-          <p className="text-[11px] text-imeet-text-muted mt-4">
-            Captions and AI answers appear in the floating overlay
-          </p>
+        {/* Live Status Cards */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-imeet-panel rounded-[10px] p-4 border border-imeet-border text-center">
+            <Mic size={20} className="text-green-400 mx-auto mb-2" />
+            <p className="text-2xl font-bold">{store.transcripts.filter(t => t.speaker === 'other').length || 0}</p>
+            <p className="text-xs text-imeet-text-muted">Segments Heard</p>
+          </div>
+          <div className="bg-imeet-panel rounded-[10px] p-4 border border-imeet-border text-center">
+            <Brain size={20} className="text-imeet-gold mx-auto mb-2" />
+            <p className="text-2xl font-bold">{answers.length}</p>
+            <p className="text-xs text-imeet-text-muted">AI Answers</p>
+          </div>
+          <div className="bg-imeet-panel rounded-[10px] p-4 border border-imeet-border text-center">
+            <Shield size={20} className="text-blue-400 mx-auto mb-2" />
+            <p className="text-sm font-medium text-blue-400 mt-1">Protected</p>
+            <p className="text-xs text-imeet-text-muted">Screen Share Safe</p>
+          </div>
+        </div>
+
+        {/* Recent AI Answer Preview */}
+        <div className="bg-imeet-panel rounded-[10px] p-5 border border-imeet-border flex-1 overflow-y-auto">
+          <h3 className="text-sm font-semibold text-imeet-gold mb-3 flex items-center gap-2">
+            <MessageSquare size={14} /> Latest AI Answer
+          </h3>
+          {answers.length > 0 ? (
+            <div className="text-sm text-white/80 leading-relaxed" dangerouslySetInnerHTML={{
+              __html: formatAnswer(answers[answers.length - 1].answer_text || 'Generating...')
+            }} />
+          ) : (
+            <p className="text-sm text-imeet-text-muted">
+              AI answers will appear here and in the floating caption overlay when questions are detected.
+            </p>
+          )}
         </div>
       </div>
     )
@@ -180,9 +214,11 @@ export default function Meeting() {
 
   // 未录制 — 新会议设置
   return (
-    <div className="h-full flex items-center justify-center">
-      <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border w-[480px] space-y-4">
-        <h2 className="text-lg font-bold text-imeet-gold">{t('meeting.new')}</h2>
+    <div className="h-full flex gap-6">
+      {/* Left: Setup Form */}
+      <div className="flex-1 flex flex-col">
+        <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border space-y-4">
+          <h2 className="text-lg font-bold text-imeet-gold">{t('meeting.new')}</h2>
 
         <input
           value={title}
@@ -247,6 +283,38 @@ export default function Meeting() {
           <Play size={20} />
           {t('meeting.start')}
         </button>
+      </div>
+      </div>
+
+      {/* Right: How it works */}
+      <div className="w-72 flex-shrink-0 space-y-4">
+        <div className="bg-imeet-panel rounded-[10px] p-5 border border-imeet-border">
+          <h3 className="text-sm font-semibold text-imeet-gold mb-4">How Voxclar Works</h3>
+          <div className="space-y-4">
+            {[
+              { icon: Zap, title: 'Real-time Captions', desc: 'Word-by-word transcription powered by Deepgram Nova-2' },
+              { icon: Brain, title: 'Smart Detection', desc: 'AI detects questions and generates context-aware answers' },
+              { icon: Shield, title: 'Screen Share Safe', desc: 'Invisible in Zoom, Teams, and Meet screen sharing' },
+              { icon: Upload, title: 'Prep Material', desc: 'Upload resumes and notes — AI references them in answers' },
+            ].map((item) => (
+              <div key={item.title} className="flex gap-3">
+                <div className="w-8 h-8 rounded-lg bg-imeet-gold/10 flex items-center justify-center flex-shrink-0">
+                  <item.icon size={14} className="text-imeet-gold" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <p className="text-xs text-imeet-text-muted leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white/[0.02] rounded-[10px] p-4 border border-imeet-border">
+          <p className="text-xs text-imeet-text-muted leading-relaxed">
+            <span className="text-imeet-gold font-medium">Tip:</span> Upload your resume in Profile and prep notes here for the best AI-generated answers tailored to your experience.
+          </p>
+        </div>
       </div>
     </div>
   )
