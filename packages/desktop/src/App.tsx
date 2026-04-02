@@ -85,7 +85,7 @@ function LoginPage() {
           </div>
 
           {/* Card */}
-          <div className="bg-imeet-panel rounded-[12px] p-8 border border-imeet-border shadow-[0_4px_6px_rgba(0,0,0,0.1)]">
+          <div className="bg-[#1a1a1a] rounded-[20px_20px_4px_20px] p-8 border border-white/[0.08] shadow-[0_4px_6px_rgba(0,0,0,0.1)]">
             <h2 className="text-lg font-semibold text-center mb-6">
               {isRegister ? t('auth.register') : t('auth.login')}
             </h2>

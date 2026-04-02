@@ -111,7 +111,7 @@ export default function Subscription() {
           return (
             <div
               key={plan.id}
-              className={`relative bg-imeet-panel rounded-[10px] p-5 border-2 transition-all hover:-translate-y-1 ${
+              className={`relative bg-imeet-panel rounded-[20px_4px_20px_20px] p-5 border-2 transition-all hover:-translate-y-1 ${
                 plan.popular
                   ? 'border-imeet-gold shadow-[0_0_20px_rgba(255,215,0,0.1)]'
                   : isCurrent
@@ -171,7 +171,7 @@ export default function Subscription() {
       </div>
 
       {/* Invite Friends */}
-      <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border">
+      <div className="bg-imeet-panel rounded-[20px_4px_20px_20px] p-6 border border-imeet-border">
         <div className="flex items-center gap-3 mb-5">
           <div className="w-10 h-10 rounded-lg bg-imeet-gold/10 flex items-center justify-center">
             <Gift size={20} className="text-imeet-gold" />

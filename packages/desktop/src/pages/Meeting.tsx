@@ -136,7 +136,7 @@ export default function Meeting() {
     return (
       <div className="h-full flex flex-col gap-5">
         {/* Top: Control Card */}
-        <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border">
+        <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-imeet-gold text-lg">{title || 'Meeting'}</h3>
@@ -176,17 +176,17 @@ export default function Meeting() {
 
         {/* Live Status Cards */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-imeet-panel rounded-[10px] p-4 border border-imeet-border text-center">
+          <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-4 border border-imeet-border text-center">
             <Mic size={20} className="text-green-400 mx-auto mb-2" />
             <p className="text-2xl font-bold">{store.transcripts.filter(t => t.speaker === 'other').length || 0}</p>
             <p className="text-xs text-imeet-text-muted">Segments Heard</p>
           </div>
-          <div className="bg-imeet-panel rounded-[10px] p-4 border border-imeet-border text-center">
+          <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-4 border border-imeet-border text-center">
             <Brain size={20} className="text-imeet-gold mx-auto mb-2" />
             <p className="text-2xl font-bold">{answers.length}</p>
             <p className="text-xs text-imeet-text-muted">AI Answers</p>
           </div>
-          <div className="bg-imeet-panel rounded-[10px] p-4 border border-imeet-border text-center">
+          <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-4 border border-imeet-border text-center">
             <Shield size={20} className="text-blue-400 mx-auto mb-2" />
             <p className="text-sm font-medium text-blue-400 mt-1">Protected</p>
             <p className="text-xs text-imeet-text-muted">Screen Share Safe</p>
@@ -194,7 +194,7 @@ export default function Meeting() {
         </div>
 
         {/* Recent AI Answer Preview */}
-        <div className="bg-imeet-panel rounded-[10px] p-5 border border-imeet-border flex-1 overflow-y-auto">
+        <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-5 border border-imeet-border flex-1 overflow-y-auto">
           <h3 className="text-sm font-semibold text-imeet-gold mb-3 flex items-center gap-2">
             <MessageSquare size={14} /> Latest AI Answer
           </h3>
@@ -217,7 +217,7 @@ export default function Meeting() {
     <div className="h-full flex gap-6 items-center">
       {/* Left: Setup Form */}
       <div className="flex-1 self-stretch flex flex-col justify-center">
-        <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border space-y-4">
+        <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border space-y-4">
           <h2 className="text-lg font-bold text-imeet-gold">{t('meeting.new')}</h2>
 
         <input
@@ -288,7 +288,7 @@ export default function Meeting() {
 
       {/* Right: How it works */}
       <div className="w-80 flex-shrink-0 space-y-4 self-stretch flex flex-col justify-center">
-        <div className="bg-imeet-panel rounded-[10px] p-5 border border-imeet-border">
+        <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-5 border border-imeet-border">
           <h3 className="text-sm font-semibold text-imeet-gold mb-4">How Voxclar Works</h3>
           <div className="space-y-4">
             {[
@@ -310,7 +310,7 @@ export default function Meeting() {
           </div>
         </div>
 
-        <div className="bg-white/[0.02] rounded-[10px] p-4 border border-imeet-border">
+        <div className="bg-white/[0.02] rounded-[20px_20px_4px_20px] p-4 border border-imeet-border">
           <p className="text-xs text-imeet-text-muted leading-relaxed">
             <span className="text-imeet-gold font-medium">Tip:</span> Upload your resume in Profile and prep notes here for the best AI-generated answers tailored to your experience.
           </p>

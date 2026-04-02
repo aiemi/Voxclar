@@ -265,7 +265,7 @@ export default function MeetingRecordPage() {
 
             {/* Editor Content */}
             <div className={`flex-1 overflow-y-auto bg-imeet-panel border border-imeet-border p-6 ${
-              mode === 'edit' ? 'rounded-b-[10px]' : 'rounded-[10px]'
+              mode === 'edit' ? 'rounded-b-[10px]' : 'rounded-[20px_20px_4px_20px]'
             }`}>
               {mode === 'preview' ? (
                 <div className="bg-white rounded-lg p-8 min-h-full text-black">

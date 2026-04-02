@@ -222,7 +222,7 @@ export default function Profile() {
       <h2 className="text-2xl font-bold text-imeet-gold">{t('profile.title')}</h2>
 
       {/* Basic Info */}
-      <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border space-y-4">
+      <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border space-y-4">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-9 h-9 rounded-lg bg-imeet-gold/10 flex items-center justify-center">
             <User size={18} className="text-imeet-gold" />
@@ -252,7 +252,7 @@ export default function Profile() {
       </div>
 
       {/* Skills */}
-      <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border">
+      <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 rounded-lg bg-imeet-gold/10 flex items-center justify-center">
             <Briefcase size={18} className="text-imeet-gold" />
@@ -289,7 +289,7 @@ export default function Profile() {
       </div>
 
       {/* Resume Upload — 支持多个文件 */}
-      <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border">
+      <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 rounded-lg bg-imeet-gold/10 flex items-center justify-center">
             <FileText size={18} className="text-imeet-gold" />

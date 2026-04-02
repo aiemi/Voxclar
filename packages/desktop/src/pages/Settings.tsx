@@ -23,7 +23,7 @@ export default function Settings() {
       <h2 className="text-2xl font-bold text-imeet-gold">{t('settings.title')}</h2>
 
       {/* Audio Source */}
-      <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border">
+      <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 rounded-lg bg-imeet-gold/10 flex items-center justify-center">
             <Volume2 size={18} className="text-imeet-gold" />
@@ -49,7 +49,7 @@ export default function Settings() {
       </div>
 
       {/* Caption Language */}
-      <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border">
+      <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 rounded-lg bg-imeet-gold/10 flex items-center justify-center">
             <Globe size={18} className="text-imeet-gold" />
@@ -82,7 +82,7 @@ export default function Settings() {
       </div>
 
       {/* App Language */}
-      <div className="bg-imeet-panel rounded-[10px] p-6 border border-imeet-border">
+      <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 rounded-lg bg-imeet-gold/10 flex items-center justify-center">
             <Globe size={18} className="text-imeet-gold" />
