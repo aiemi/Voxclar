@@ -82,7 +82,8 @@ class DeepgramStream:
         )
 
         try:
-            self._ws = await websockets.connect(
+            from websockets.asyncio.client import connect as ws_connect
+            self._ws = await ws_connect(
                 url,
                 additional_headers={"Authorization": f"Token {self._api_key}"},
                 ping_interval=20,

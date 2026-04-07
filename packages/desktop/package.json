@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build:electron": "tsc -p tsconfig.electron.json",
-    "build:web": "tsc --noEmit && vite build",
+    "build:web": "vite build",
     "build": "npm run build:electron && npm run build:web && electron-builder",
     "preview": "vite preview",
-    "electron:dev": "npm run build:electron && concurrently \"vite\" \"wait-on http://localhost:5173 && NODE_ENV=development electron .\"",
+    "electron:dev": "npm run build:electron && concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -36,6 +36,7 @@
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.0",
     "concurrently": "^9.0.0",
+    "cross-env": "^10.1.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0",
     "postcss": "^8.4.0",
@@ -70,6 +71,13 @@
       "target": [
         "AppImage"
       ]
-    }
+    },
+    "extraResources": [
+      {
+        "from": "../local-engine/dist/voxclar-engine",
+        "to": "engine",
+        "filter": ["**/*"]
+      }
+    ]
   }
 }

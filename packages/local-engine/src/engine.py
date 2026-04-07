@@ -198,6 +198,8 @@ class MeetingEngine:
             if not mic_ok:
                 logger.warning("Mic Deepgram connection failed (non-critical)")
 
+            self.is_running = True  # Set before starting capture so callbacks aren't dropped
+
             self._capture = DualAudioCaptureManager()
             self._capture.on_system_audio = self._on_system_audio
             self._capture.on_mic_audio = self._on_mic_audio

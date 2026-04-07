@@ -51,7 +51,7 @@ function createMainWindow() {
     mainWindow.loadURL(VITE_URL)
     // mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
+    mainWindow.loadFile(path.join(__dirname, '../dist-renderer/index.html'))
   }
 
   // 拦截所有 window.open 调用 — 外部链接用系统浏览器打开
@@ -101,7 +101,7 @@ function createCaptionWindow() {
   if (isDev) {
     captionWindow.loadURL(`${VITE_URL}/#/caption`)
   } else {
-    captionWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash: '/caption' })
+    captionWindow.loadFile(path.join(__dirname, '../dist-renderer/index.html'), { hash: '/caption' })
   }
 
   captionWindow.once('ready-to-show', () => {
@@ -148,14 +148,33 @@ function setWindowSharingProtection(win: BrowserWindow) {
 // ═══════════════════════════════════════════════════════════════════
 
 function startEngine() {
-  const enginePath = path.join(__dirname, '../../local-engine')
+  let cmd: string
+  let args: string[]
+  let cwd: string
+  const engineEnv = { ...process.env, PYTHONUNBUFFERED: '1' }
 
-  // 尝试用 poetry run，fallback 到直接 python
-  const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
-  engineProcess = spawn(pythonCmd, ['-m', 'src.server'], {
-    cwd: enginePath,
+  if (isDev) {
+    // 开发模式：用 poetry run
+    cwd = path.join(__dirname, '../../local-engine')
+    cmd = 'poetry'
+    args = ['run', 'python', '-m', 'src.server']
+  } else {
+    // 生产模式：用 PyInstaller 打包的可执行文件
+    const engineDir = path.join(process.resourcesPath, 'engine')
+    cwd = engineDir
+    if (process.platform === 'win32') {
+      cmd = path.join(engineDir, 'voxclar-engine.exe')
+    } else {
+      cmd = path.join(engineDir, 'voxclar-engine')
+    }
+    args = []
+  }
+
+  engineProcess = spawn(cmd, args, {
+    cwd,
     stdio: 'pipe',
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    shell: isDev,
+    env: engineEnv,
   })
 
   engineProcess.stdout?.on('data', (data: Buffer) => {
