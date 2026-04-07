@@ -5,6 +5,29 @@ import { MessageCircle, X, Send, Mail } from 'lucide-react'
 // @ts-ignore — Vite env
 const BASE_URL: string = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
 
+/** Lightweight markdown → HTML for chat messages */
+function renderMarkdown(text: string): string {
+  return text
+    // Code blocks (```)
+    .replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:0.85em">$1</code>')
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Italic
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Numbered lists
+    .replace(/^\d+\.\s+(.+)$/gm, '<li style="margin-left:16px;list-style:decimal">$1</li>')
+    // Bullet lists
+    .replace(/^[-•]\s+(.+)$/gm, '<li style="margin-left:16px;list-style:disc">$1</li>')
+    // Wrap consecutive <li> in <ul>
+    .replace(/((?:<li[^>]*>.*?<\/li>\n?)+)/g, '<ul style="margin:4px 0;padding:0">$1</ul>')
+    // Line breaks
+    .replace(/\n/g, '<br>')
+    // Clean up double <br> after </ul>
+    .replace(/<\/ul><br>/g, '</ul>')
+}
+
 interface Message {
   role: 'user' | 'assistant'
   content: string
@@ -164,13 +187,19 @@ export default function SupportChat() {
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+              className={`max-w-[80%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-imeet-gold/15 text-imeet-gold rounded-br-sm'
-                  : 'bg-white/5 text-imeet-text-primary rounded-bl-sm'
+                  ? 'bg-imeet-gold/15 text-imeet-gold rounded-br-sm whitespace-pre-wrap'
+                  : 'bg-white/5 text-imeet-text-primary rounded-bl-sm support-msg'
               }`}
             >
-              {msg.content || (
+              {msg.content ? (
+                msg.role === 'assistant' ? (
+                  <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                ) : (
+                  msg.content
+                )
+              ) : (
                 <span className="inline-flex gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-imeet-text-muted animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-1.5 h-1.5 rounded-full bg-imeet-text-muted animate-bounce" style={{ animationDelay: '150ms' }} />
