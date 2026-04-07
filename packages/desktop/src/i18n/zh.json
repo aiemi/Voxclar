@@ -285,6 +285,17 @@
     "back": "返回",
     "user": "用户"
   },
+  "support": {
+    "title": "客服支持",
+    "subtitle": "AI助手 — 随时解答Voxclar相关问题",
+    "welcome": "你好！有什么可以帮你的吗？",
+    "placeholder": "输入你的问题...",
+    "email_fallback": "需要更多帮助？发邮件至 service@voxclar.com",
+    "error_message": "抱歉，出了点问题。请重试或发邮件至 service@voxclar.com。",
+    "quick_1": "如何设置？",
+    "quick_2": "没有捕获到音频",
+    "quick_3": "订阅方案"
+  },
   "legal": {
     "terms_title": "服务条款",
     "privacy_title": "隐私政策",

@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import get_settings
 from src.core.exceptions import register_exception_handlers
-from src.api.v1 import auth, users, meetings, transcripts, payments, profiles, asr_proxy, llm_proxy, referrals, asr_api, blog
+from src.api.v1 import auth, users, meetings, transcripts, payments, profiles, asr_proxy, llm_proxy, referrals, asr_api, blog, support
 from src.api.v1.blog_pages import router as blog_pages_router
 from src.api.websocket import router as ws_router
 
@@ -49,6 +49,7 @@ app.include_router(asr_proxy.router, prefix="/api/v1/asr", tags=["asr"])
 app.include_router(llm_proxy.router, prefix="/api/v1/ai", tags=["ai"])
 app.include_router(referrals.router, prefix="/api/v1/referrals", tags=["referrals"])
 app.include_router(blog.router, prefix="/api/v1/blog", tags=["blog"])
+app.include_router(support.router, prefix="/api/v1/support", tags=["support"])
 app.include_router(asr_api.router, prefix="/v1", tags=["asr-api"])  # Public API: /v1/listen
 app.include_router(ws_router, prefix="/api/v1/ws", tags=["websocket"])
 

@@ -5,6 +5,7 @@ import { api } from '@/services/api'
 import { loadLifetimeConfig as loadLtConfigFromStorage, saveLifetimeConfigStorage } from '@/services/storage'
 import { Globe, Volume2, Key, Cpu, Eye, EyeOff, CheckCircle, AlertCircle, Copy, RefreshCw, Code } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import SupportChat from '@/components/SupportChat'
 
 const electronAPI = (window as unknown as { electronAPI?: {
   platform: string
@@ -426,6 +427,9 @@ export default function Settings() {
           ))}
         </div>
       </div>
+
+      {/* Support Chat */}
+      <SupportChat />
 
     </div>
   )

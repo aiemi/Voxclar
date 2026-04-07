@@ -285,6 +285,17 @@
     "back": "Back",
     "user": "User"
   },
+  "support": {
+    "title": "Support",
+    "subtitle": "AI assistant — ask anything about Voxclar",
+    "welcome": "Hi! How can I help you today?",
+    "placeholder": "Type your question...",
+    "email_fallback": "Need more help? Email service@voxclar.com",
+    "error_message": "Sorry, something went wrong. Please try again or email service@voxclar.com.",
+    "quick_1": "How to set up?",
+    "quick_2": "No audio captured",
+    "quick_3": "Pricing plans"
+  },
   "legal": {
     "terms_title": "Terms of Service",
     "privacy_title": "Privacy Policy",
