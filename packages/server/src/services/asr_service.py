@@ -51,11 +51,11 @@ async def proxy_asr_stream(websocket: WebSocket, language: str = "en"):
     dg_connection.on(LiveTranscriptionEvents.Transcript, on_transcript)
     dg_connection.on(LiveTranscriptionEvents.Error, on_error)
 
-    dg_lang = language if language != "multi" else "multi"
+    # Deepgram Nova-2: use detect_language for multi, specific code otherwise
+    use_detect_language = language in ("multi", "auto", "")
 
     options = LiveOptions(
         model="nova-2",
-        language=dg_lang,
         smart_format=True,
         interim_results=True,
         endpointing=1500,
@@ -66,12 +66,24 @@ async def proxy_asr_stream(websocket: WebSocket, language: str = "en"):
         sample_rate=16000,
         channels=1,
     )
+    if use_detect_language:
+        options.detect_language = True
+    else:
+        options.language = language
 
-    if not await dg_connection.start(options):
+    try:
+        started = await dg_connection.start(options)
+    except Exception as e:
+        logger.error(f"Deepgram start error: {e}")
+        await websocket.send_json({"type": "error", "message": f"Deepgram error: {e}"})
+        return
+
+    if not started:
+        logger.error("Deepgram connection failed to start")
         await websocket.send_json({"type": "error", "message": "Failed to connect to Deepgram"})
         return
 
-    logger.info(f"ASR proxy started: language={dg_lang}")
+    logger.info(f"ASR proxy started: language={language}, detect_language={use_detect_language}")
 
     try:
         async for data in websocket.iter_bytes():

@@ -149,13 +149,14 @@ export function useEngine() {
     const { useAuthStore } = await import('@/stores/authStore')
     const user = useAuthStore.getState().user
     const isLifetime = user?.subscription_tier === 'lifetime'
-    const isSubscriber = user?.subscription_tier === 'standard' || user?.subscription_tier === 'pro'
+    // Free + Standard + Pro all use server mode (isSubscriber check removed)
 
-    let asrMode = 'deepgram'
+    let asrMode = 'server'  // Default: go through server (works for free + subscribers)
     let userApiKeys: Record<string, string> | undefined
     let aiModel = 'auto'
-    let serverApiUrl = ''
-    let serverToken = ''
+    // @ts-ignore
+    let serverApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
+    let serverToken = localStorage.getItem('access_token') || ''
 
     if (isLifetime) {
       // Lifetime: local engine handles everything with user's own API keys
@@ -171,13 +172,8 @@ export function useEngine() {
           if (lc.deepseek_api_key) userApiKeys['DEEPSEEK_API_KEY'] = lc.deepseek_api_key
         }
       } catch {}
-    } else if (isSubscriber) {
-      // Subscribers: ASR and AI answers go through server
-      asrMode = 'server'
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
-      serverApiUrl = apiUrl
-      serverToken = localStorage.getItem('access_token') || ''
     }
+    // Free + Standard + Pro: all go through server (server has API keys)
 
     sendMessage({
       type: 'start_meeting',

@@ -51,7 +51,7 @@ function createMainWindow() {
     mainWindow.loadURL(VITE_URL)
     // mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist-renderer/index.html'))
+    mainWindow.loadFile(path.join(__dirname, '../app-dist/index.html'))
   }
 
   // 拦截所有 window.open 调用 — 外部链接用系统浏览器打开
@@ -101,7 +101,7 @@ function createCaptionWindow() {
   if (isDev) {
     captionWindow.loadURL(`${VITE_URL}/#/caption`)
   } else {
-    captionWindow.loadFile(path.join(__dirname, '../dist-renderer/index.html'), { hash: '/caption' })
+    captionWindow.loadFile(path.join(__dirname, '../app-dist/index.html'), { hash: '/caption' })
   }
 
   captionWindow.once('ready-to-show', () => {
@@ -151,53 +151,61 @@ function startEngine() {
   let cmd: string
   let args: string[]
   let cwd: string
-  const engineEnv = { ...process.env, PYTHONUNBUFFERED: '1' }
 
   if (isDev) {
-    // 开发模式：用 poetry run
+    // 开发模式：直接用 Python 源码
     cwd = path.join(__dirname, '../../local-engine')
-    cmd = 'poetry'
-    args = ['run', 'python', '-m', 'src.server']
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
+    cmd = pythonCmd
+    args = ['-m', 'src.server']
   } else {
-    // 生产模式：用 PyInstaller 打包的可执行文件
-    const engineDir = path.join(process.resourcesPath, 'engine')
-    cwd = engineDir
-    if (process.platform === 'win32') {
-      cmd = path.join(engineDir, 'voxclar-engine.exe')
-    } else {
-      cmd = path.join(engineDir, 'voxclar-engine')
-    }
+    // 生产模式：用 PyInstaller 打包的二进制
+    const engineName = process.platform === 'win32' ? 'voxclar-engine.exe' : 'voxclar-engine'
+    cmd = path.join(process.resourcesPath, 'engine', engineName)
     args = []
+    cwd = path.dirname(cmd)
   }
 
+  console.log(`[Engine] Starting: ${cmd} ${args.join(' ')} (cwd: ${cwd})`)
   engineProcess = spawn(cmd, args, {
     cwd,
     stdio: 'pipe',
-    shell: isDev,
-    env: engineEnv,
+    env: { ...process.env, PYTHONUNBUFFERED: '1' },
   })
 
   engineProcess.stdout?.on('data', (data: Buffer) => {
-    const msg = data.toString().trim()
-    console.log(`[Engine] ${msg}`)
-    // 转发引擎日志到渲染进程
-    mainWindow?.webContents.send('engine:log', msg)
+    try {
+      const msg = data.toString().trim()
+      if (msg) {
+        console.log(`[Engine] ${msg}`)
+        mainWindow?.webContents.send('engine:log', msg)
+      }
+    } catch {}
   })
 
   engineProcess.stderr?.on('data', (data: Buffer) => {
-    console.error(`[Engine] ${data.toString().trim()}`)
+    try {
+      const msg = data.toString().trim()
+      if (msg) console.error(`[Engine] ${msg}`)
+    } catch {}
   })
 
   engineProcess.on('exit', (code: number | null) => {
     console.log(`[Engine] Process exited with code ${code}`)
     engineProcess = null
-    mainWindow?.webContents.send('engine:status', 'disconnected')
+    try { mainWindow?.webContents.send('engine:status', 'disconnected') } catch {}
   })
 
   engineProcess.on('error', (err: Error) => {
+    if (err.message.includes('EPIPE')) return // Engine process already dead, ignore
     console.error(`[Engine] Failed to start: ${err.message}`)
-    mainWindow?.webContents.send('engine:error', err.message)
+    try { mainWindow?.webContents.send('engine:error', err.message) } catch {}
   })
+
+  // Prevent uncaught EPIPE crash
+  engineProcess.stdin?.on('error', () => {})
+  engineProcess.stdout?.on('error', () => {})
+  engineProcess.stderr?.on('error', () => {})
 }
 
 function stopEngine() {

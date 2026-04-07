@@ -51,13 +51,30 @@
     "directories": {
       "buildResources": "build"
     },
+    "files": [
+      "dist-electron/**/*",
+      "app-dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/engine/",
+        "to": "engine/",
+        "filter": ["**/*"]
+      }
+    ],
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "notarize": true
     },
     "win": {
       "icon": "build/icon.ico",

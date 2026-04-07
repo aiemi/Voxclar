@@ -31,7 +31,7 @@ class ServerASRStream:
         self._send_task = None
         self._recv_task = None
 
-    async def connect(self):
+    async def connect(self) -> bool:
         """Connect to server ASR proxy WebSocket."""
         try:
             # Add token as query param for WebSocket auth
@@ -44,10 +44,12 @@ class ServerASRStream:
             self._recv_task = asyncio.create_task(self._receive_loop())
 
             logger.info(f"Connected to server ASR proxy: {self.ws_url}")
+            return True
 
         except Exception as e:
             logger.error(f"Failed to connect to server ASR: {e}")
             self._connected = False
+            return False
 
     def send_audio(self, audio: np.ndarray):
         """Send audio chunk to server (called from audio capture thread)."""
