@@ -1,8 +1,7 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Save, Plus, X, Upload, User, Briefcase, FileText, CheckCircle, File } from 'lucide-react'
-
-const STORAGE_KEY = 'voxclar_profile'
+import { loadProfile as loadProfileStorage, saveProfileLocal } from '@/services/storage'
 
 interface ResumeItem {
   name: string
@@ -19,10 +18,10 @@ interface ProfileData {
   context: string  // 预构建的 AI context（所有信息浓缩）
 }
 
-function loadProfile(): ProfileData {
+function loadProfileLocal(): ProfileData {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
+    const data = loadProfileStorage()
+    if (data) return { name: '', headline: '', summary: '', skills: [], resumes: [], context: '', ...data }
   } catch {}
   return { name: '', headline: '', summary: '', skills: [], resumes: [], context: '' }
 }
@@ -60,7 +59,7 @@ function fileToBase64(file: File): Promise<string> {
 
 export default function Profile() {
   const { t } = useTranslation()
-  const saved = loadProfile()
+  const saved = loadProfileLocal()
   const [name, setName] = useState(saved.name)
   const [headline, setHeadline] = useState(saved.headline)
   const [summary, setSummary] = useState(saved.summary)
@@ -212,7 +211,7 @@ export default function Profile() {
     const context = await summarizeContext({ name, headline, summary, skills, resumes })
 
     const data: ProfileData = { name, headline, summary, skills, resumes, context }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    saveProfileLocal(data)
     setSaveStatus('saved')
     setTimeout(() => setSaveStatus('idle'), 2000)
   }
@@ -228,17 +227,17 @@ export default function Profile() {
             <User size={18} className="text-imeet-gold" />
           </div>
           <h3 className="font-semibold">
-            Basic Information
-            {extracting && <span className="text-xs text-imeet-gold ml-2 animate-pulse">Extracting from resume...</span>}
+            {t('profile.basic_info')}
+            {extracting && <span className="text-xs text-imeet-gold ml-2 animate-pulse">{t('profile.extracting')}</span>}
           </h3>
         </div>
         <div>
           <label className="block text-xs text-imeet-text-muted mb-1.5 uppercase tracking-wider">{t('profile.name')}</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} className="input-field w-full" placeholder="Your full name" />
+          <input value={name} onChange={(e) => setName(e.target.value)} className="input-field w-full" placeholder={t('profile.name_placeholder')} />
         </div>
         <div>
           <label className="block text-xs text-imeet-text-muted mb-1.5 uppercase tracking-wider">{t('profile.headline')}</label>
-          <input value={headline} onChange={(e) => setHeadline(e.target.value)} className="input-field w-full" placeholder="e.g. Senior Software Engineer at Google" />
+          <input value={headline} onChange={(e) => setHeadline(e.target.value)} className="input-field w-full" placeholder={t('profile.headline_placeholder')} />
         </div>
         <div>
           <label className="block text-xs text-imeet-text-muted mb-1.5 uppercase tracking-wider">{t('profile.summary')}</label>
@@ -246,7 +245,7 @@ export default function Profile() {
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
             className="input-field w-full h-28 resize-none"
-            placeholder="Brief professional summary — AI will use this to tailor answers to your experience"
+            placeholder={t('profile.summary_placeholder')}
           />
         </div>
       </div>
@@ -259,7 +258,7 @@ export default function Profile() {
           </div>
           <div>
             <h3 className="font-semibold">{t('profile.skills')}</h3>
-            <p className="text-xs text-imeet-text-muted">AI uses these to match relevant experience</p>
+            <p className="text-xs text-imeet-text-muted">{t('profile.skills_hint')}</p>
           </div>
         </div>
         {skills.length > 0 && (
@@ -280,7 +279,7 @@ export default function Profile() {
             onChange={(e) => setNewSkill(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addSkill()}
             className="input-field flex-1"
-            placeholder="Add a skill (e.g. Python, System Design)..."
+            placeholder={t('profile.skill_placeholder')}
           />
           <button onClick={addSkill} className="px-4 py-2 rounded-lg border-2 border-imeet-gold/50 text-imeet-gold hover:bg-imeet-gold/10 transition-colors">
             <Plus size={16} />
@@ -296,7 +295,7 @@ export default function Profile() {
           </div>
           <div>
             <h3 className="font-semibold">{t('profile.upload_resume')}</h3>
-            <p className="text-xs text-imeet-text-muted">Upload multiple resumes — AI references all of them when answering</p>
+            <p className="text-xs text-imeet-text-muted">{t('profile.resume_hint')}</p>
           </div>
         </div>
 
@@ -332,7 +331,7 @@ export default function Profile() {
           className="w-full py-5 rounded-lg border-2 border-dashed border-imeet-border hover:border-imeet-gold/50 flex flex-col items-center gap-2 text-imeet-text-muted hover:text-imeet-gold transition-all"
         >
           <Upload size={22} />
-          <span className="text-sm">{resumes.length > 0 ? 'Add more files' : 'Click to upload PDF, DOCX or TXT'}</span>
+          <span className="text-sm">{resumes.length > 0 ? t('profile.add_more') : t('profile.upload_click')}</span>
         </button>
       </div>
 
@@ -346,7 +345,7 @@ export default function Profile() {
         }`}
       >
         {saveStatus === 'saved' ? (
-          <><CheckCircle size={18} /> Saved!</>
+          <><CheckCircle size={18} /> {t('profile.saved')}</>
         ) : (
           <><Save size={18} /> {t('profile.save')}</>
         )}

@@ -48,6 +48,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStatus: () => ipcRenderer.invoke('security:getStatus'),
   },
 
+  // 用系统浏览器打开外部链接
+  openExternal: (url: string) => ipcRenderer.invoke('open:external', url),
+
   // 平台信息
   platform: process.platform,
 })

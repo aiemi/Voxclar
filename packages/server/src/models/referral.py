@@ -33,7 +33,7 @@ class Referral(Base, UUIDMixin, TimestampMixin):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     # 6 位邀请码 (如 VX3K8M)
-    code: Mapped[str] = mapped_column(String(10), unique=True, index=True)
+    code: Mapped[str] = mapped_column(String(10), index=True)
     status: Mapped[str] = mapped_column(String(20), default="pending")
 
     # 奖励状态

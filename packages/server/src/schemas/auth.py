@@ -1,6 +1,18 @@
 from pydantic import BaseModel, EmailStr
 
 
+class SendCodeRequest(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
+    referral_code: str | None = None
+
+
+class VerifyCodeRequest(BaseModel):
+    email: EmailStr
+    code: str
+
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     username: str

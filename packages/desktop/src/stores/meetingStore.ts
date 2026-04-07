@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Meeting, Transcript, Answer, MeetingRecord } from '@/types'
+import { saveRecordLocal, loadRecordsSync, updateRecordLocal } from '@/services/storage'
 
 /**
  * 双轨累积：system(other) 和 mic(user) 各自独立累积文本。
@@ -7,8 +8,6 @@ import type { Meeting, Transcript, Answer, MeetingRecord } from '@/types'
  * interim 更新当前条目文本但不创建新条目。
  * 两个轨道不互相干扰。
  */
-
-const RECORDS_KEY = 'voxclar_meeting_records'
 
 interface MeetingState {
   activeMeeting: Meeting | null
@@ -29,26 +28,6 @@ interface MeetingState {
   reset: () => void
 }
 
-/** 保存会议记录到 localStorage */
-function saveRecord(record: MeetingRecord) {
-  try {
-    const raw = localStorage.getItem(RECORDS_KEY)
-    const records: MeetingRecord[] = raw ? JSON.parse(raw) : []
-    records.unshift(record)
-    // 保留最近 50 条
-    if (records.length > 50) records.length = 50
-    localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
-  } catch {}
-}
-
-/** 读取历史会议记录 */
-export function loadRecords(): MeetingRecord[] {
-  try {
-    const raw = localStorage.getItem(RECORDS_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch { return [] }
-}
-
 // 每个 speaker 轨道的累积状态
 interface TrackState {
   entryId: string       // 当前 transcript 条目的 id
@@ -60,6 +39,11 @@ const tracks: Record<string, TrackState> = {}
 function resetTracks() {
   delete tracks['other']
   delete tracks['user']
+}
+
+/** 读取历史会议记录 (同步, 本地用户用) */
+export function loadRecords(): MeetingRecord[] {
+  return loadRecordsSync()
 }
 
 export const useMeetingStore = create<MeetingState>((set, get) => ({
@@ -88,7 +72,8 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         transcripts: [...transcripts],
         answers: [...answers],
       }
-      saveRecord(record)
+      // Always save locally (per-user key)
+      saveRecordLocal(record)
       set({ isRecording: false, lastRecord: record })
     } else {
       set({ isRecording: false })
@@ -103,7 +88,6 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       let track = tracks[speaker]
 
       if (!track) {
-        // 这个 speaker 第一次说话 — 创建新条目 + 新轨道
         const id = crypto.randomUUID()
         tracks[speaker] = { entryId: id, confirmedText: isFinal ? text : '' }
         transcripts.push({
@@ -118,10 +102,8 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
         return { transcripts }
       }
 
-      // 找到这个 speaker 当前的条目
       const idx = transcripts.findIndex((t) => t.id === track.entryId)
       if (idx === -1) {
-        // 条目丢失了（不应该发生），重新创建
         const id = crypto.randomUUID()
         tracks[speaker] = { entryId: id, confirmedText: isFinal ? text : '' }
         transcripts.push({
@@ -137,7 +119,6 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       }
 
       if (isFinal) {
-        // 追加到已确认文本
         track.confirmedText = track.confirmedText
           ? `${track.confirmedText} ${text}`
           : text
@@ -147,7 +128,6 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
           timestamp_ms: Date.now(),
         }
       } else {
-        // interim — 显示 confirmed + pending
         const display = track.confirmedText
           ? `${track.confirmedText} ${text}`
           : text
@@ -179,15 +159,8 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   setLastRecordSummary: (summary) => set((state) => {
     if (!state.lastRecord) return state
     const updated = { ...state.lastRecord, summary, summaryGenerating: false }
-    // 同步更新 localStorage
-    try {
-      const raw = localStorage.getItem(RECORDS_KEY)
-      const records: MeetingRecord[] = raw ? JSON.parse(raw) : []
-      if (records[0]?.meeting.id === updated.meeting.id) {
-        records[0] = updated
-        localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
-      }
-    } catch {}
+    // 同步更新本地存储
+    updateRecordLocal(updated.meeting.id, () => updated)
     return { lastRecord: updated }
   }),
 

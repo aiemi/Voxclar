@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useEngine } from '@/hooks/useEngine'
 import { useMeetingStore } from '@/stores/meetingStore'
+import { useAuthStore } from '@/stores/authStore'
+import { api } from '@/services/api'
 import type { MeetingType } from '@/types'
 import { Play, Square, Clock, MonitorUp, Upload, File, X, Loader2, Shield, Zap, Brain, Mic, MessageSquare } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
@@ -90,9 +92,45 @@ export default function Meeting() {
     if (prepFileRef.current) prepFileRef.current.value = ''
   }
 
-  const handleStart = () => {
+  const handleStart = async () => {
+    const allPrepNotes = [
+      prepNotes,
+      ...prepFiles.map((f) => `[${f.name}]\n${f.summary}`),
+    ].filter(Boolean).join('\n\n')
+
+    let meetingId = crypto.randomUUID()
+    const user = useAuthStore.getState().user
+    const isLifetime = user?.subscription_tier === 'lifetime'
+
+    if (isLifetime) {
+      try {
+        const { loadLifetimeConfig } = await import('@/services/storage')
+        const lc = loadLifetimeConfig() || {}
+        if (!lc.claude_api_key && !lc.openai_api_key && !lc.deepseek_api_key) {
+          alert(t('meeting.no_api_key'))
+          navigate('/settings')
+          return
+        }
+      } catch {}
+    }
+
+    if (!isLifetime) {
+      try {
+        const serverMeeting = await api.createMeeting({
+          title, meeting_type: meetingType, language, prep_notes: allPrepNotes,
+        })
+        meetingId = serverMeeting.id
+      } catch (err: any) {
+        console.error('Failed to create meeting:', err)
+        if (err?.message?.includes('Insufficient') || err?.message?.includes('402')) {
+          alert(t('meeting.insufficient_minutes'))
+          return
+        }
+      }
+    }
+
     store.startMeeting({
-      id: crypto.randomUUID(),
+      id: meetingId,
       title,
       meeting_type: meetingType,
       language,
@@ -101,21 +139,52 @@ export default function Meeting() {
       points_consumed: 0,
       created_at: new Date().toISOString(),
     })
-    const allPrepNotes = [
-      prepNotes,
-      ...prepFiles.map((f) => `[${f.name}]\n${f.summary}`),
-    ].filter(Boolean).join('\n\n')
+
     startMeeting({ title, meeting_type: meetingType, language, audio_source: 'system', prep_notes: allPrepNotes })
     electronAPI?.caption.show()
     setCaptionVisible(true)
   }
 
-  const handleStop = () => {
+  const handleStop = async () => {
     stopMeeting()
+    const meeting = store.activeMeeting
     store.stopMeeting()
     clearInterval(timerRef.current)
     electronAPI?.caption.hide()
     setCaptionVisible(false)
+
+    const user = useAuthStore.getState().user
+    const isLifetime = user?.subscription_tier === 'lifetime'
+
+    if (meeting && !isLifetime) {
+      try {
+        await api.endMeeting(meeting.id)
+        const updatedUser = await api.getCurrentUser()
+        useAuthStore.getState().updateUser(updatedUser)
+      } catch (err) {
+        console.warn('End meeting failed:', err)
+      }
+
+      if (user && ['standard', 'pro'].includes(user.subscription_tier)) {
+        api.syncMeetingRecord({
+          meeting_id: meeting.id,
+          transcripts: store.transcripts.map((t) => ({
+            speaker: t.speaker,
+            text: t.text,
+            timestamp_ms: t.timestamp_ms,
+            is_question: t.is_question,
+          })),
+          answers: store.answers.map((a) => ({
+            question_text: a.question_text,
+            answer_text: a.answer_text,
+            question_type: a.question_type,
+            model_used: a.model_used,
+          })),
+          summary: store.lastRecord?.summary,
+        }).catch((err) => console.warn('Sync failed:', err))
+      }
+    }
+
     setTimeout(() => navigate('/records'), 500)
   }
 
@@ -139,7 +208,7 @@ export default function Meeting() {
         <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold text-imeet-gold text-lg">{title || 'Meeting'}</h3>
+              <h3 className="font-semibold text-imeet-gold text-lg">{title || t('nav.meeting')}</h3>
               <p className="text-xs text-imeet-text-muted capitalize">{meetingType.replace('_', ' ')}</p>
             </div>
             <div className="flex items-center gap-4">
@@ -149,7 +218,7 @@ export default function Meeting() {
               </div>
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10">
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                <span className="text-xs text-red-400 font-medium">LIVE</span>
+                <span className="text-xs text-red-400 font-medium">{t('meeting.live')}</span>
               </div>
             </div>
           </div>
@@ -158,7 +227,7 @@ export default function Meeting() {
               onClick={handleStop}
               className="flex-1 py-2.5 rounded-lg border-2 border-red-500/50 text-red-400 font-semibold flex items-center justify-center gap-2 hover:bg-red-500/10 transition-colors"
             >
-              <Square size={14} /> End Meeting
+              <Square size={14} /> {t('meeting.end_meeting')}
             </button>
             <button
               onClick={toggleCaption}
@@ -167,7 +236,7 @@ export default function Meeting() {
                   ? 'border-imeet-gold text-imeet-gold bg-imeet-gold/10'
                   : 'border-imeet-border text-imeet-text-muted hover:border-imeet-gold'
               }`}
-              title="Toggle Caption Window"
+              title={t('meeting.toggle_caption')}
             >
               <MonitorUp size={16} />
             </button>
@@ -179,32 +248,32 @@ export default function Meeting() {
           <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-4 border border-imeet-border text-center">
             <Mic size={20} className="text-green-400 mx-auto mb-2" />
             <p className="text-2xl font-bold">{store.transcripts.filter(t => t.speaker === 'other').length || 0}</p>
-            <p className="text-xs text-imeet-text-muted">Segments Heard</p>
+            <p className="text-xs text-imeet-text-muted">{t('meeting.segments_heard')}</p>
           </div>
           <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-4 border border-imeet-border text-center">
             <Brain size={20} className="text-imeet-gold mx-auto mb-2" />
             <p className="text-2xl font-bold">{answers.length}</p>
-            <p className="text-xs text-imeet-text-muted">AI Answers</p>
+            <p className="text-xs text-imeet-text-muted">{t('meeting.ai_answers_count')}</p>
           </div>
           <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-4 border border-imeet-border text-center">
             <Shield size={20} className="text-blue-400 mx-auto mb-2" />
-            <p className="text-sm font-medium text-blue-400 mt-1">Protected</p>
-            <p className="text-xs text-imeet-text-muted">Screen Share Safe</p>
+            <p className="text-sm font-medium text-blue-400 mt-1">{t('meeting.protected')}</p>
+            <p className="text-xs text-imeet-text-muted">{t('meeting.screen_share_safe')}</p>
           </div>
         </div>
 
         {/* Recent AI Answer Preview */}
         <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-5 border border-imeet-border flex-1 overflow-y-auto">
           <h3 className="text-sm font-semibold text-imeet-gold mb-3 flex items-center gap-2">
-            <MessageSquare size={14} /> Latest AI Answer
+            <MessageSquare size={14} /> {t('meeting.latest_answer')}
           </h3>
           {answers.length > 0 ? (
             <div className="text-sm text-white/80 leading-relaxed" dangerouslySetInnerHTML={{
-              __html: formatAnswer(answers[answers.length - 1].answer_text || 'Generating...')
+              __html: formatAnswer(answers[answers.length - 1].answer_text || t('common.loading'))
             }} />
           ) : (
             <p className="text-sm text-imeet-text-muted">
-              AI answers will appear here and in the floating caption overlay when questions are detected.
+              {t('meeting.answer_hint')}
             </p>
           )}
         </div>
@@ -212,7 +281,6 @@ export default function Meeting() {
     )
   }
 
-  // 未录制 — 新会议设置
   return (
     <div className="h-full flex gap-6 items-center">
       {/* Left: Setup Form */}
@@ -237,10 +305,10 @@ export default function Meeting() {
             value={language}
             onChange={setLanguage}
             options={[
-              { value: 'en', label: 'English' },
-              { value: 'zh', label: '中文' },
-              { value: 'ja', label: '日本語' },
-              { value: 'multi', label: 'Auto-detect' },
+              { value: 'en', label: t('meeting.lang_en') },
+              { value: 'zh', label: t('meeting.lang_zh') },
+              { value: 'ja', label: t('meeting.lang_ja') },
+              { value: 'multi', label: t('meeting.lang_auto') },
             ]}
           />
         </div>
@@ -273,7 +341,7 @@ export default function Meeting() {
           disabled={summarizing}
           className="w-full py-2.5 rounded-lg border border-dashed border-imeet-border hover:border-imeet-gold/50 text-xs text-imeet-text-muted hover:text-imeet-gold transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
         >
-          {summarizing ? <><Loader2 size={12} className="animate-spin" /> Analyzing...</> : <><Upload size={12} /> Upload prep files (PDF/Word/PPT)</>}
+          {summarizing ? <><Loader2 size={12} className="animate-spin" /> {t('meeting.analyzing')}</> : <><Upload size={12} /> {t('meeting.upload_prep')}</>}
         </button>
 
         <button
@@ -289,21 +357,21 @@ export default function Meeting() {
       {/* Right: How it works */}
       <div className="w-80 flex-shrink-0 space-y-4 self-stretch flex flex-col justify-center">
         <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-5 border border-imeet-border">
-          <h3 className="text-sm font-semibold text-imeet-gold mb-4">How Voxclar Works</h3>
+          <h3 className="text-sm font-semibold text-imeet-gold mb-4">{t('meeting.how_it_works')}</h3>
           <div className="space-y-4">
             {[
-              { icon: Zap, title: 'Real-time Captions', desc: 'Word-by-word transcription powered by Deepgram Nova-2' },
-              { icon: Brain, title: 'Smart Detection', desc: 'AI detects questions and generates context-aware answers' },
-              { icon: Shield, title: 'Screen Share Safe', desc: 'Invisible in Zoom, Teams, and Meet screen sharing' },
-              { icon: Upload, title: 'Prep Material', desc: 'Upload resumes and notes — AI references them in answers' },
+              { icon: Zap, titleKey: 'meeting.how_works_captions', descKey: 'meeting.how_works_captions_desc' },
+              { icon: Brain, titleKey: 'meeting.how_works_detection', descKey: 'meeting.how_works_detection_desc' },
+              { icon: Shield, titleKey: 'meeting.how_works_safe', descKey: 'meeting.how_works_safe_desc' },
+              { icon: Upload, titleKey: 'meeting.how_works_prep', descKey: 'meeting.how_works_prep_desc' },
             ].map((item) => (
-              <div key={item.title} className="flex gap-3">
+              <div key={item.titleKey} className="flex gap-3">
                 <div className="w-8 h-8 rounded-lg bg-imeet-gold/10 flex items-center justify-center flex-shrink-0">
                   <item.icon size={14} className="text-imeet-gold" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">{item.title}</p>
-                  <p className="text-xs text-imeet-text-muted leading-relaxed">{item.desc}</p>
+                  <p className="text-sm font-medium">{t(item.titleKey)}</p>
+                  <p className="text-xs text-imeet-text-muted leading-relaxed">{t(item.descKey)}</p>
                 </div>
               </div>
             ))}
@@ -312,10 +380,16 @@ export default function Meeting() {
 
         <div className="bg-white/[0.02] rounded-[20px_20px_4px_20px] p-4 border border-imeet-border">
           <p className="text-xs text-imeet-text-muted leading-relaxed">
-            <span className="text-imeet-gold font-medium">Tip:</span> Upload your resume in Profile and prep notes here for the best AI-generated answers tailored to your experience.
+            <span className="text-imeet-gold font-medium">Tip:</span> {t('meeting.tip')}
           </p>
         </div>
       </div>
     </div>
   )
+}
+
+function formatAnswer(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br/>')
 }

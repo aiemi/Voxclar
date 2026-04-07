@@ -22,7 +22,7 @@ export type MeetingType =
 
 export type QuestionType = 'technical' | 'behavioral' | 'general'
 export type Speaker = 'user' | 'other' | 'system'
-export type SubscriptionTier = 'free' | 'basic' | 'standard' | 'pro'
+export type SubscriptionTier = 'free' | 'standard' | 'pro' | 'lifetime'
 export type EngineStatus = 'disconnected' | 'connecting' | 'ready' | 'running' | 'error'
 
 export interface MeetingConfig {

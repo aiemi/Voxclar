@@ -28,10 +28,12 @@ export default function Dashboard() {
           <div>
             <h2 className="text-2xl font-bold">
               <AnimatedText text={`${t('dashboard.welcome')}, `} />
-              <AnimatedText text={user?.username || 'User'} className="text-imeet-gold" />
+              <AnimatedText text={user?.username || t('common.user')} className="text-imeet-gold" />
             </h2>
             <p className="text-white/[0.35] text-sm mt-1">
-              {user?.subscription_tier ? `${user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)} Plan` : 'Free Plan'}
+              {user?.subscription_tier
+                ? `${user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)} ${t('dashboard.plan_suffix')}`
+                : t('dashboard.free_plan')}
             </p>
           </div>
           {/* Engine status pill */}
@@ -56,7 +58,7 @@ export default function Dashboard() {
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
               <Mic size={18} className="text-blue-400" />
             </div>
-            <span className="text-sm text-white/[0.5]">Meetings</span>
+            <span className="text-sm text-white/[0.5]">{t('dashboard.stats.meetings')}</span>
           </div>
           <p className="text-3xl font-bold">0</p>
         </div>
@@ -65,28 +67,31 @@ export default function Dashboard() {
             <div className="w-10 h-10 rounded-xl bg-imeet-gold/10 flex items-center justify-center">
               <Timer size={18} className="text-imeet-gold" />
             </div>
-            <span className="text-sm text-white/[0.5]">Time Left</span>
+            <span className="text-sm text-white/[0.5]">{user?.subscription_tier === 'lifetime' ? t('dashboard.license') : t('dashboard.time_left')}</span>
           </div>
-          <p className="text-3xl font-bold text-imeet-gold">{user?.points_balance ?? 10} <span className="text-base font-normal text-white/[0.35]">min</span></p>
+          {user?.subscription_tier === 'lifetime'
+            ? <p className="text-3xl font-bold text-purple-400">∞ <span className="text-base font-normal text-white/[0.35]">{t('dashboard.unlimited')}</span></p>
+            : <p className="text-3xl font-bold text-imeet-gold">{user?.points_balance ?? 10} <span className="text-base font-normal text-white/[0.35]">{t('common.minutes')}</span></p>
+          }
         </div>
       </div>
 
-      {/* Feature Grid — 4 cards with different corner cuts like website */}
+      {/* Feature Grid */}
       <div className="grid grid-cols-2 gap-4">
         {[
-          { icon: Zap, title: 'Real-time Captions', desc: 'Word-by-word powered by Deepgram Nova-2', radius: '20px 20px 4px 20px' },
-          { icon: Brain, title: 'AI Answers', desc: 'Claude & GPT with your resume context', radius: '20px 4px 20px 20px' },
-          { icon: Shield, title: 'Screen Share Safe', desc: 'Invisible in Zoom, Teams, Meet', radius: '4px 20px 20px 20px' },
-          { icon: FileText, title: 'Meeting Records', desc: 'Full transcript + branded PDF export', radius: '20px 20px 20px 4px' },
+          { icon: Zap, titleKey: 'dashboard.features.captions', descKey: 'dashboard.features.captions_desc', radius: '20px 20px 4px 20px' },
+          { icon: Brain, titleKey: 'dashboard.features.ai_answers', descKey: 'dashboard.features.ai_answers_desc', radius: '20px 4px 20px 20px' },
+          { icon: Shield, titleKey: 'dashboard.features.screen_safe', descKey: 'dashboard.features.screen_safe_desc', radius: '4px 20px 20px 20px' },
+          { icon: FileText, titleKey: 'dashboard.features.records', descKey: 'dashboard.features.records_desc', radius: '20px 20px 20px 4px' },
         ].map((feat) => (
           <div
-            key={feat.title}
+            key={feat.titleKey}
             className="bg-white/[0.02] border border-white/[0.06] p-5 hover:-translate-y-1 hover:border-imeet-gold/[0.15] transition-all duration-300 cursor-default"
             style={{ borderRadius: feat.radius }}
           >
             <feat.icon size={22} className="text-imeet-gold mb-3" />
-            <h3 className="text-imeet-gold font-semibold text-[13px] mb-1">{feat.title}</h3>
-            <p className="text-[12px] text-white/[0.4] leading-relaxed">{feat.desc}</p>
+            <h3 className="text-imeet-gold font-semibold text-[13px] mb-1">{t(feat.titleKey)}</h3>
+            <p className="text-[12px] text-white/[0.4] leading-relaxed">{t(feat.descKey)}</p>
           </div>
         ))}
       </div>

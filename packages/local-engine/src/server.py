@@ -74,6 +74,9 @@ async def handle_client(websocket):
                         prep_docs_summary=msg.get("prep_docs_summary", ""),
                         meeting_title=msg.get("meeting_title", ""),
                         memory_data=msg.get("memory_data", ""),
+                        asr_mode=msg.get("asr_mode", "deepgram"),
+                        user_api_keys=msg.get("user_api_keys"),
+                        ai_model=msg.get("ai_model", "auto"),
                     )
                     await websocket.send(json.dumps({
                         "type": "engine_status",

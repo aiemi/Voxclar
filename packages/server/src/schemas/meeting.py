@@ -42,3 +42,24 @@ class MeetingListResponse(BaseModel):
 
 class ExportRequest(BaseModel):
     format: str = "txt"  # txt, json, pdf
+
+
+class SyncTranscriptItem(BaseModel):
+    speaker: str
+    text: str
+    timestamp_ms: int = 0
+    is_question: bool = False
+
+
+class SyncAnswerItem(BaseModel):
+    question_text: str
+    answer_text: str
+    question_type: str = "general"
+    model_used: str | None = None
+
+
+class MeetingSyncRequest(BaseModel):
+    meeting_id: str
+    transcripts: list[SyncTranscriptItem] = []
+    answers: list[SyncAnswerItem] = []
+    summary: str | None = None

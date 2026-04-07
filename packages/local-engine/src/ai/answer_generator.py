@@ -15,10 +15,12 @@ async def generate_answer(
     context: MeetingContext,
     question: str,
     question_type: str = "general",
+    preferred_model: str = "auto",
 ) -> AsyncGenerator[str, None]:
     """流式生成回答。
 
     context 包含：profile、简历、准备资料、历史 Q&A、用户发言。
+    preferred_model: "auto" (default routing), "claude", "openai", "deepseek"
     """
     system_prompt, user_message = context.build_prompt(question, question_type)
 
@@ -26,6 +28,21 @@ async def generate_answer(
     openai_key = os.environ.get("OPENAI_API_KEY")
     deepseek_key = os.environ.get("DEEPSEEK_API_KEY")
 
+    # User-specified model preference (lifetime users)
+    if preferred_model == "claude" and claude_key:
+        async for token in _call_claude(system_prompt, user_message, claude_key):
+            yield token
+        return
+    elif preferred_model == "openai" and openai_key:
+        async for token in _call_openai(system_prompt, user_message, openai_key):
+            yield token
+        return
+    elif preferred_model == "deepseek" and deepseek_key:
+        async for token in _call_deepseek(system_prompt, user_message, deepseek_key):
+            yield token
+        return
+
+    # Auto routing:
     # behavioral/technical → Claude（结构化回答最强）
     # general → DeepSeek V3（最便宜最快）
     # fallback chain: DeepSeek → OpenAI → Claude

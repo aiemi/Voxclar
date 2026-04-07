@@ -9,9 +9,9 @@ from src.models.base import Base, UUIDMixin, TimestampMixin
 
 class SubscriptionTier(str, enum.Enum):
     free = "free"
-    basic = "basic"
     standard = "standard"
     pro = "pro"
+    lifetime = "lifetime"
 
 
 class User(Base, UUIDMixin, TimestampMixin):
@@ -27,6 +27,11 @@ class User(Base, UUIDMixin, TimestampMixin):
         DateTime(timezone=True), nullable=True
     )
     points_balance: Mapped[int] = mapped_column(Integer, default=10)
+    topup_balance: Mapped[int] = mapped_column(Integer, default=0)
+    asr_balance: Mapped[int] = mapped_column(Integer, default=0)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    api_key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     meetings = relationship("Meeting", back_populates="user", lazy="selectin")

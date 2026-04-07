@@ -94,22 +94,21 @@ async def apply_referral_code(
     if not referral_code:
         return False
 
-    # 查找邀请码
+    # 查找邀请码 — 找到该码的原始记录（推荐人的码）
+    code = referral_code.upper().strip()
     result = await db.execute(
-        select(Referral).where(Referral.code == referral_code.upper().strip())
+        select(Referral).where(Referral.code == code)
     )
-    referral = result.scalar_one_or_none()
+    referral = result.scalars().first()
 
     if not referral:
         logger.warning(f"Invalid referral code: {referral_code}")
         return False
 
-    if referral.status != ReferralStatus.pending:
-        logger.warning(f"Referral code already used: {referral_code}")
-        return False
+    referrer_id = referral.referrer_id
 
     # 不能自己推荐自己
-    if referral.referrer_id == new_user.id:
+    if referrer_id == new_user.id:
         return False
 
     # ── 防刷检查 ──
@@ -145,25 +144,33 @@ async def apply_referral_code(
             logger.warning(f"Referral blocked: duplicate device fingerprint")
             return False
 
-    # ── 通过检查，发放被推荐人奖励 ──
+    # ── 通过检查，创建新的推荐记录并发放推荐人奖励 ──
 
-    referral.referred_id = new_user.id
-    referral.status = ReferralStatus.registered
-    referral.referred_bonus_granted = True
-    referral.referred_ip = ip_address
-    referral.referred_device_fingerprint = device_fingerprint
-    referral.referred_email_domain = email_domain
+    new_referral = Referral(
+        referrer_id=referrer_id,
+        referred_id=new_user.id,
+        code=code,
+        status=ReferralStatus.registered,
+        referred_bonus_granted=True,
+        referred_ip=ip_address,
+        referred_device_fingerprint=device_fingerprint,
+        referred_email_domain=email_domain,
+    )
+    db.add(new_referral)
 
-    # 被推荐人获得额外分钟
-    new_user.points_balance += REFERRED_BONUS
-    db.add(Transaction(
-        user_id=new_user.id,
-        type=TransactionType.bonus,
-        points=REFERRED_BONUS,
-        description=f"Referral bonus: {REFERRED_BONUS} min free (invited by {referral.code})",
-    ))
+    # 推荐人获得奖励（朋友注册 → 你得 10 分钟）
+    referrer_result = await db.execute(select(User).where(User.id == referrer_id))
+    referrer = referrer_result.scalar_one_or_none()
+    if referrer:
+        referrer.points_balance += REFERRED_BONUS
+        db.add(Transaction(
+            user_id=referrer.id,
+            type=TransactionType.bonus,
+            points=REFERRED_BONUS,
+            description=f"Referral bonus: +{REFERRED_BONUS} min (friend {new_user.email.split('@')[0]} signed up)",
+        ))
 
-    logger.info(f"Referral {referral_code} applied: {new_user.email} gets {REFERRED_BONUS} min")
+    logger.info(f"Referral {referral_code} applied: referrer gets {REFERRED_BONUS} min, new user: {new_user.email}")
     return True
 
 

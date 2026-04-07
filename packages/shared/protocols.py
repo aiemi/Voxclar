@@ -39,9 +39,9 @@ class Speaker(str, Enum):
 
 class SubscriptionTier(str, Enum):
     FREE = "free"
-    BASIC = "basic"
     STANDARD = "standard"
     PRO = "pro"
+    LIFETIME = "lifetime"
 
 
 class EngineStatus(str, Enum):

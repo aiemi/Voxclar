@@ -27,6 +27,20 @@ def _get_session_factory(settings: Settings):
     return _session_factory
 
 
+def get_session_factory():
+    """Get session factory for non-Depends contexts (e.g. ASR API)."""
+    return _get_session_factory(get_settings())
+
+# Alias for import convenience
+async_session_factory = None
+
+def _ensure_async_session_factory():
+    global async_session_factory
+    if async_session_factory is None:
+        async_session_factory = _get_session_factory(get_settings())
+    return async_session_factory
+
+
 async def get_db(
     settings: Settings = Depends(get_settings),
 ) -> AsyncGenerator[AsyncSession, None]:

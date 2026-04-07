@@ -9,9 +9,9 @@ from src.models.base import Base, UUIDMixin, CreatedAtMixin
 
 
 class SubscriptionPlan(str, enum.Enum):
-    basic = "basic"
     standard = "standard"
     pro = "pro"
+    lifetime = "lifetime"
 
 
 class Subscription(Base, UUIDMixin, CreatedAtMixin):

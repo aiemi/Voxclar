@@ -23,7 +23,9 @@ async def create_meeting(
     user = result.scalar_one_or_none()
     if not user:
         raise NotFound("User not found")
-    if user.points_balance < 1 and user.subscription_tier == "free":
+    if user.subscription_tier == "lifetime":
+        pass  # Lifetime users have no limits
+    elif user.points_balance < 1 and user.topup_balance < 1 and user.subscription_tier == "free":
         raise InsufficientPoints()
 
     meeting = Meeting(
@@ -89,18 +91,28 @@ async def end_meeting(db: AsyncSession, meeting_id: str, user_id: str) -> Meetin
         minutes_used = max(1, (duration + 59) // 60)  # 向上取整到分钟，最少1分钟
         meeting.points_consumed = minutes_used
 
-        # 扣减剩余时间（分钟）
+        # 扣减剩余时间: 先扣订阅分钟，不够再扣加时包
         user_result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
         user = user_result.scalar_one()
-        user.points_balance = max(0, user.points_balance - minutes_used)
 
-        db.add(Transaction(
-            user_id=uuid.UUID(user_id),
-            type=TransactionType.consume,
-            points=-minutes_used,
-            description=f"Meeting: {meeting.title or 'Untitled'} ({minutes_used} min)",
-            meeting_id=meeting.id,
-        ))
+        if user.subscription_tier != "lifetime":
+            remaining = minutes_used
+            # First deduct from subscription balance
+            sub_deduct = min(user.points_balance, remaining)
+            user.points_balance -= sub_deduct
+            remaining -= sub_deduct
+            # Then deduct from top-up balance
+            if remaining > 0:
+                topup_deduct = min(user.topup_balance, remaining)
+                user.topup_balance -= topup_deduct
+
+            db.add(Transaction(
+                user_id=uuid.UUID(user_id),
+                type=TransactionType.consume,
+                points=-minutes_used,
+                description=f"Meeting: {meeting.title or 'Untitled'} ({minutes_used} min)",
+                meeting_id=meeting.id,
+            ))
 
     return meeting
 

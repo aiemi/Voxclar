@@ -6,6 +6,7 @@
 import asyncio
 import json
 import logging
+import os
 import platform
 import time
 from typing import Callable
@@ -68,13 +69,25 @@ class MeetingEngine:
     def start_meeting(self, meeting_type: str = "general", language: str = "en",
                       audio_source: str = "system", prep_notes: str = "",
                       profile_context: str = "", prep_docs_summary: str = "",
-                      meeting_title: str = "", memory_data: str = ""):
+                      meeting_title: str = "", memory_data: str = "",
+                      asr_mode: str = "deepgram",
+                      user_api_keys: dict | None = None,
+                      ai_model: str = "auto"):
         if self.is_running:
             logger.warning("Meeting already running")
             return
 
         self._meeting_start_time = time.time()
         self._meeting_title = meeting_title
+        self._asr_mode = asr_mode  # "deepgram" or "local"
+        self._user_api_keys = user_api_keys or {}
+        self._ai_model = ai_model  # "auto", "claude", "openai", "deepseek"
+
+        # Lifetime 用户：注入自定义 API keys 到环境变量
+        if self._user_api_keys:
+            for key, value in self._user_api_keys.items():
+                if value:
+                    os.environ[key] = value
 
         # 加载历史记忆
         if memory_data:
@@ -101,56 +114,91 @@ class MeetingEngine:
         # 智能问题检测（LLM）
         self._detector = SmartQuestionDetector(default_language=language)
 
-        # Deepgram
-        self._system_deepgram = DeepgramStream(
-            language=language,
-            on_transcript=self._on_system_transcript,
-        )
-        self._mic_deepgram = DeepgramStream(
-            language=language,
-            on_transcript=self._on_mic_transcript,
-        )
+        # ASR — Deepgram (cloud) or faster-whisper (local)
+        self._local_asr = None
+        if self._asr_mode == "local":
+            from src.asr.streaming import StreamingASR
+            self._local_asr = StreamingASR(model_size="small", language=language)
+            self._system_deepgram = None
+            self._mic_deepgram = None
+            logger.info("Using local ASR (faster-whisper)")
+        else:
+            self._system_deepgram = DeepgramStream(
+                language=language,
+                on_transcript=self._on_system_transcript,
+            )
+            self._mic_deepgram = DeepgramStream(
+                language=language,
+                on_transcript=self._on_mic_transcript,
+            )
+            logger.info("Using cloud ASR (Deepgram)")
 
         if self._loop:
             asyncio.run_coroutine_threadsafe(self._connect_and_start(), self._loop)
 
     async def _connect_and_start(self):
-        system_ok = await self._system_deepgram.connect()
-        if not system_ok:
-            if self.on_error:
-                self.on_error({
-                    "type": "error",
-                    "message": "Deepgram connection failed. Check DEEPGRAM_API_KEY.",
-                    "fatal": True,
-                })
-            return
+        if self._asr_mode == "local":
+            # Local ASR mode — no Deepgram connection needed
+            self._capture = DualAudioCaptureManager()
+            self._capture.on_system_audio = self._on_system_audio_local
+            self._capture.on_mic_audio = self._on_mic_audio_local
 
-        mic_ok = await self._mic_deepgram.connect()
-        if not mic_ok:
-            logger.warning("Mic Deepgram connection failed (non-critical)")
+            self._capture.start_system_audio()
+            if not self._capture.system_audio_available:
+                if self.on_error:
+                    self.on_error({
+                        "type": "error",
+                        "message": "System audio capture not available.",
+                        "fatal": True,
+                    })
+                return
 
-        self._capture = DualAudioCaptureManager()
-        self._capture.on_system_audio = self._on_system_audio
-        self._capture.on_mic_audio = self._on_mic_audio
+            try:
+                self._capture.start_mic()
+            except Exception as e:
+                logger.warning(f"Mic capture failed: {e}")
 
-        self._capture.start_system_audio()
-        if not self._capture.system_audio_available:
-            if self.on_error:
-                self.on_error({
-                    "type": "error",
-                    "message": "System audio capture not available.",
-                    "fatal": True,
-                })
+            # Start local ASR polling loop
+            asyncio.ensure_future(self._local_asr_poll_loop())
+        else:
+            # Cloud ASR mode — connect to Deepgram
+            system_ok = await self._system_deepgram.connect()
+            if not system_ok:
+                if self.on_error:
+                    self.on_error({
+                        "type": "error",
+                        "message": "Deepgram connection failed. Check DEEPGRAM_API_KEY.",
+                        "fatal": True,
+                    })
+                return
 
-        try:
-            self._capture.start_mic()
-        except Exception as e:
-            logger.warning(f"Mic capture failed: {e}")
+            mic_ok = await self._mic_deepgram.connect()
+            if not mic_ok:
+                logger.warning("Mic Deepgram connection failed (non-critical)")
+
+            self._capture = DualAudioCaptureManager()
+            self._capture.on_system_audio = self._on_system_audio
+            self._capture.on_mic_audio = self._on_mic_audio
+
+            self._capture.start_system_audio()
+            if not self._capture.system_audio_available:
+                if self.on_error:
+                    self.on_error({
+                        "type": "error",
+                        "message": "System audio capture not available.",
+                        "fatal": True,
+                    })
+
+            try:
+                self._capture.start_mic()
+            except Exception as e:
+                logger.warning(f"Mic capture failed: {e}")
 
         self.is_running = True
+        asr_label = "local (faster-whisper)" if self._asr_mode == "local" else "deepgram"
         logger.info(
             f"Meeting started: type={self._context.meeting_type}, "
-            f"lang={self._context.language}, asr=deepgram, "
+            f"lang={self._context.language}, asr={asr_label}, "
             f"system_audio={self._capture.system_capture_method}"
         )
 
@@ -312,6 +360,43 @@ class MeetingEngine:
             logger.error(f"Mic audio error: {e}")
 
     # ═══════════════════════════════════════════════════════════════════
+    # 本地 ASR (faster-whisper) 音频回调 + 轮询
+    # ═══════════════════════════════════════════════════════════════════
+
+    def _on_system_audio_local(self, audio: np.ndarray):
+        """Local ASR mode: feed system audio to faster-whisper."""
+        if not self.is_running or not self._local_asr:
+            return
+        try:
+            if self._noise_reducer and self._noise_reducer.enabled:
+                audio = self._noise_reducer.process(audio)
+            self._local_asr.feed_audio(audio)
+            if self._echo_canceller:
+                self._echo_canceller.feed_reference(audio)
+        except Exception as e:
+            logger.error(f"Local ASR system audio error: {e}")
+
+    def _on_mic_audio_local(self, audio: np.ndarray):
+        """Local ASR mode: no separate mic ASR, just echo cancellation reference."""
+        if not self.is_running:
+            return
+        # In local mode we don't run a separate mic ASR to save CPU
+        # Echo cancellation reference is handled in system audio handler
+
+    async def _local_asr_poll_loop(self):
+        """Poll local ASR for results every 200ms."""
+        while self.is_running and self._local_asr:
+            result = self._local_asr.get_result()
+            if result and result.get("text"):
+                # Process like a Deepgram transcript
+                self._on_system_transcript({
+                    "text": result["text"],
+                    "is_final": result.get("is_final", False),
+                    "language": result.get("language", self._context.language),
+                })
+            await asyncio.sleep(0.2)
+
+    # ═══════════════════════════════════════════════════════════════════
     # Deepgram 转写回调 — 和初版完全一样的逻辑，只把规则检测换成 LLM
     # ═══════════════════════════════════════════════════════════════════
 
@@ -433,6 +518,7 @@ class MeetingEngine:
                 context=self._context,
                 question=question,
                 question_type=question_type,
+                preferred_model=getattr(self, '_ai_model', 'auto'),
             ):
                 if self.on_answer_token:
                     self.on_answer_token({"type": "answer", "token": token})

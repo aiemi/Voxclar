@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.dependencies import get_db, get_current_user_id
-from src.schemas.meeting import MeetingCreate, MeetingUpdate, MeetingResponse, MeetingListResponse
+from src.schemas.meeting import MeetingCreate, MeetingUpdate, MeetingResponse, MeetingListResponse, MeetingSyncRequest
 from src.schemas.transcript import TranscriptResponse, TranscriptListResponse
-from src.services import meeting_service
+from src.services import meeting_service, sync_service
 
 router = APIRouter()
 
@@ -88,3 +88,16 @@ async def get_answers(
 ):
     answers = await meeting_service.get_answers(db, meeting_id, user_id)
     return {"answers": answers, "total": len(answers)}
+
+
+@router.post("/sync")
+async def sync_meeting_record(
+    body: MeetingSyncRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sync meeting transcripts, answers, and summary from desktop client (subscribers only)."""
+    await sync_service.sync_meeting_data(
+        db, user_id, body.meeting_id, body.transcripts, body.answers, body.summary
+    )
+    return {"synced": True}

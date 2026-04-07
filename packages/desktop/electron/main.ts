@@ -7,7 +7,7 @@
  * 3. 自动启动 Python 本地引擎
  * 4. macOS 原生集成（交通灯按钮、dock 菜单）
  */
-import { app, BrowserWindow, ipcMain, screen, systemPreferences, nativeImage, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, screen, systemPreferences, nativeImage, dialog, shell } from 'electron'
 import { spawn, ChildProcess } from 'child_process'
 import { writeFile } from 'fs/promises'
 import path from 'path'
@@ -53,6 +53,14 @@ function createMainWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+
+  // 拦截所有 window.open 调用 — 外部链接用系统浏览器打开
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url)
+    }
+    return { action: 'deny' }
+  })
 
   // 窗口准备好再显示，避免白屏闪烁
   mainWindow.once('ready-to-show', () => {
@@ -253,6 +261,11 @@ ipcMain.handle('security:getStatus', () => ({
   contentProtection: true,
   platform: process.platform,
 }))
+
+// 用系统浏览器打开外部链接（Stripe Checkout 等）
+ipcMain.handle('open:external', (_event, url: string) => {
+  shell.openExternal(url)
+})
 
 // ═══════════════════════════════════════════════════════════════════
 // 应用生命周期

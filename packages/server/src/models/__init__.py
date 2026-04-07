@@ -7,8 +7,9 @@ from src.models.answer import Answer
 from src.models.transaction import Transaction
 from src.models.subscription import Subscription
 from src.models.referral import Referral
+from src.models.license import License
 
 __all__ = [
     "Base", "User", "Profile", "Meeting", "Transcript",
-    "Answer", "Transaction", "Subscription", "Referral",
+    "Answer", "Transaction", "Subscription", "Referral", "License",
 ]

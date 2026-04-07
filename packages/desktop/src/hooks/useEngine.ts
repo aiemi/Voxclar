@@ -81,7 +81,7 @@ export function useEngine() {
           break
         case 'save_memory':
           if (msg.memory) {
-            localStorage.setItem('voxclar_memory', JSON.stringify(msg.memory))
+            import('@/services/storage').then(({ saveMemory }) => saveMemory(msg.memory))
           }
           break
         case 'meeting_summary':
@@ -126,19 +126,42 @@ export function useEngine() {
     }
   }, [])
 
-  const startMeeting = useCallback((config: MeetingConfig) => {
+  const startMeeting = useCallback(async (config: MeetingConfig) => {
     // 清空字幕窗口上一次会议的内容
     electronAPI?.caption.update({ transcript: null, answer: null })
 
-    // 加载 profile context
+    // 加载 profile context (per-user)
     let profileContext = ''
     try {
-      const raw = localStorage.getItem('voxclar_profile')
-      if (raw) profileContext = JSON.parse(raw).context || ''
+      const { loadProfile } = await import('@/services/storage')
+      const profile = await loadProfile()
+      if (profile) profileContext = profile.context || ''
     } catch {}
 
-    // 加载历史记忆
-    const memoryData = localStorage.getItem('voxclar_memory') || ''
+    // 加载历史记忆 (per-user)
+    let memoryData = ''
+    try {
+      const { loadMemory } = await import('@/services/storage')
+      memoryData = loadMemory()
+    } catch {}
+
+    // Lifetime users: load API keys and ASR mode preference
+    let asrMode = 'deepgram'
+    let userApiKeys: Record<string, string> | undefined
+    let aiModel = 'auto'
+    try {
+      const { loadLifetimeConfig } = await import('@/services/storage')
+      const lc = loadLifetimeConfig()
+      if (lc) {
+        // Lifetime users choose: "local" (faster-whisper) or "cloud" (Voxclar Cloud ASR / Deepgram)
+        asrMode = lc.asr_mode === 'cloud' ? 'deepgram' : 'local'
+        aiModel = lc.ai_model || 'auto'
+        userApiKeys = {}
+        if (lc.claude_api_key) userApiKeys['CLAUDE_API_KEY'] = lc.claude_api_key
+        if (lc.openai_api_key) userApiKeys['OPENAI_API_KEY'] = lc.openai_api_key
+        if (lc.deepseek_api_key) userApiKeys['DEEPSEEK_API_KEY'] = lc.deepseek_api_key
+      }
+    } catch {}
 
     sendMessage({
       type: 'start_meeting',
@@ -150,6 +173,9 @@ export function useEngine() {
       profile_context: profileContext,
       prep_docs_summary: config.prep_notes,
       memory_data: memoryData,
+      asr_mode: asrMode,
+      user_api_keys: userApiKeys,
+      ai_model: aiModel,
     })
   }, [sendMessage])
 

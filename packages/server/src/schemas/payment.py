@@ -8,19 +8,39 @@ class PlanResponse(BaseModel):
     id: str
     name: str
     tier: str
-    price_monthly: float
-    points_per_month: int
+    price: float
+    price_type: str  # "free" | "monthly" | "one_time"
+    minutes: int
     features: list[str]
 
 
-class SubscribeRequest(BaseModel):
-    tier: str
-    payment_token: str | None = None
+class CheckoutRequest(BaseModel):
+    plan_id: str  # "standard" | "pro" | "lifetime" | "topup"
 
 
-class PurchasePointsRequest(BaseModel):
-    points: int
-    payment_token: str | None = None
+class CheckoutResponse(BaseModel):
+    checkout_url: str
+
+
+class PortalResponse(BaseModel):
+    portal_url: str
+
+
+class LicenseActivateRequest(BaseModel):
+    device_id: str
+    device_name: str = ""
+
+
+class LicenseVerifyRequest(BaseModel):
+    device_id: str
+
+
+class LicenseResponse(BaseModel):
+    valid: bool
+    license_key: str | None = None
+    version: str | None = None
+    activated_at: str | None = None
+    reason: str | None = None
 
 
 class TransactionResponse(BaseModel):

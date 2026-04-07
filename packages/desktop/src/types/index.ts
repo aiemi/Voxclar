@@ -3,9 +3,11 @@ export interface User {
   email: string
   username: string
   avatar_url?: string
-  subscription_tier: 'free' | 'basic' | 'standard' | 'pro'
+  subscription_tier: 'free' | 'standard' | 'pro' | 'lifetime'
   subscription_expires_at?: string
   points_balance: number
+  topup_balance: number
+  asr_balance: number
   is_active: boolean
   created_at: string
 }
@@ -100,5 +102,6 @@ export interface UserStats {
   total_duration_minutes: number
   meetings_this_month: number
   points_balance: number
+  topup_balance: number
   subscription_tier: string
 }

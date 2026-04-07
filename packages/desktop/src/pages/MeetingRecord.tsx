@@ -1,11 +1,13 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import TextAlign from '@tiptap/extension-text-align'
 import Highlight from '@tiptap/extension-highlight'
-import { useMeetingStore, loadRecords } from '@/stores/meetingStore'
+import { useMeetingStore } from '@/stores/meetingStore'
+import { loadRecordsSync, loadRecords } from '@/services/storage'
 import { useAuthStore } from '@/stores/authStore'
 import type { MeetingRecord } from '@/types'
 import {
@@ -77,19 +79,43 @@ function ToolbarButton({ onClick, active, children, title }: {
 }
 
 export default function MeetingRecordPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { lastRecord } = useMeetingStore()
   const user = useAuthStore((s) => s.user)
-  const [records, setRecords] = useState<MeetingRecord[]>(loadRecords)
+  const [records, setRecords] = useState<MeetingRecord[]>(() => loadRecordsSync())
   const [selectedId, setSelectedId] = useState<string | null>(lastRecord?.meeting.id || records[0]?.meeting.id || null)
   const [copied, setCopied] = useState(false)
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
+  const [cloudLoading, setCloudLoading] = useState(false)
+
+  const isCloudUser = user?.subscription_tier === 'standard' || user?.subscription_tier === 'pro'
+
+  // Load cloud records for subscribers
+  useEffect(() => {
+    if (!isCloudUser) return
+    setCloudLoading(true)
+    loadRecords().then((cloudRecords) => {
+      if (cloudRecords.length > 0) {
+        // Merge: cloud records + any local-only records (from lastRecord)
+        const cloudIds = new Set(cloudRecords.map((r) => r.meeting.id))
+        const localOnly = records.filter((r) => !cloudIds.has(r.meeting.id))
+        const merged = [...localOnly, ...cloudRecords]
+        setRecords(merged)
+        if (!selectedId && merged.length > 0) {
+          setSelectedId(merged[0].meeting.id)
+        }
+      }
+    }).catch(() => {}).finally(() => setCloudLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteRecord = (id: string) => {
     const updated = records.filter((r) => r.meeting.id !== id)
     setRecords(updated)
+    // Sync to per-user localStorage
+    const userId = user?.id || 'anonymous'
     try {
-      localStorage.setItem('voxclar_meeting_records', JSON.stringify(updated))
+      localStorage.setItem(`voxclar_${userId}_records`, JSON.stringify(updated))
     } catch {}
     if (selectedId === id) {
       setSelectedId(updated[0]?.meeting.id || null)
@@ -104,7 +130,7 @@ export default function MeetingRecordPage() {
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Placeholder.configure({ placeholder: 'Meeting record will appear here...' }),
+      Placeholder.configure({ placeholder: t('records.placeholder') }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Highlight,
     ],
@@ -126,19 +152,34 @@ export default function MeetingRecordPage() {
   const exportPDF = async () => {
     if (!editor || !record || !electronAPI) return
     const editorHtml = editor.getHTML()
-    const title = record.meeting.title || 'Untitled Meeting'
+    const title = record.meeting.title || t('records.untitled')
     const html = wrapInPDFTemplate(editorHtml, record)
     await electronAPI.export.savePDF(html, `Voxclar-${title.replace(/\s+/g, '_')}.pdf`)
   }
 
+  if (cloudLoading) {
+    return (
+      <div className="h-[calc(100vh-7rem)] flex items-center justify-center">
+        <p className="text-sm text-imeet-text-muted">{t('common.loading')}</p>
+      </div>
+    )
+  }
+
+  if (!record && records.length === 0) {
+    return (
+      <div className="h-[calc(100vh-7rem)] flex items-center justify-center">
+        <p className="text-sm text-imeet-text-muted">{t('records.no_meetings')}</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="h-full flex gap-5">
+    <div className="h-[calc(100vh-7rem)] flex gap-5">
       {/* Left: Meeting List */}
       <div className="w-60 flex-shrink-0 flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-imeet-gold mb-1">Meeting History</h3>
+        <h3 className="text-sm font-semibold text-imeet-gold mb-1">{t('records.history')}</h3>
 
         <div className="flex-1 overflow-y-auto space-y-1.5">
-          {records.length === 0 && <p className="text-xs text-imeet-text-muted">No meetings yet</p>}
           {records.map((r) => (
             <div
               key={r.meeting.id}
@@ -168,15 +209,15 @@ export default function MeetingRecordPage() {
       {/* Right: Editor */}
       <div className="flex-1 flex flex-col min-w-0">
         {!record ? (
-          <div className="flex-1 flex items-center justify-center text-imeet-text-muted">
-            Select a meeting to view its record
+          <div className="flex-1 flex items-center justify-center text-imeet-text-muted text-center px-8" style={{ marginLeft: '-15rem' }}>
+            <p className="text-sm">{t('records.select_meeting')}</p>
           </div>
         ) : (
           <>
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h2 className="text-lg font-bold">{record.meeting.title || 'Untitled Meeting'}</h2>
+                <h2 className="text-lg font-bold">{record.meeting.title || t('records.untitled')}</h2>
                 <p className="text-xs text-imeet-text-muted">
                   {formatDate(record.meeting.created_at)} · {formatDuration(record.meeting.duration_seconds)}
                 </p>
@@ -190,7 +231,7 @@ export default function MeetingRecordPage() {
                       mode === 'edit' ? 'bg-imeet-gold/15 text-imeet-gold' : 'text-imeet-text-muted hover:text-white'
                     }`}
                   >
-                    <Pencil size={12} /> Edit
+                    <Pencil size={12} /> {t('records.edit')}
                   </button>
                   <button
                     onClick={() => setMode('preview')}
@@ -198,16 +239,16 @@ export default function MeetingRecordPage() {
                       mode === 'preview' ? 'bg-imeet-gold/15 text-imeet-gold' : 'text-imeet-text-muted hover:text-white'
                     }`}
                   >
-                    <Eye size={12} /> Preview
+                    <Eye size={12} /> {t('records.preview')}
                   </button>
                 </div>
                 <button onClick={copyText} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                   copied ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-imeet-text-secondary hover:text-white'
                 }`}>
-                  {copied ? <CheckCircle size={14} /> : <><Copy size={14} className="inline mr-1" />Copy</>}
+                  {copied ? <CheckCircle size={14} /> : <><Copy size={14} className="inline mr-1" />{t('records.copy')}</>}
                 </button>
                 <button onClick={exportPDF} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-imeet-gold text-black hover:bg-imeet-gold-hover transition-all">
-                  <FileDown size={14} className="inline mr-1" />Export PDF
+                  <FileDown size={14} className="inline mr-1" />{t('records.export_pdf')}
                 </button>
               </div>
             </div>

@@ -1,7 +1,12 @@
-from sqlalchemy import String, Text, ForeignKey, ARRAY
+from sqlalchemy import String, Text, ForeignKey, ARRAY, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from pgvector.sqlalchemy import Vector
+
+try:
+    from pgvector.sqlalchemy import Vector
+    _EmbeddingType = Vector(1536)
+except Exception:
+    _EmbeddingType = LargeBinary
 
 from src.models.base import Base, UUIDMixin, TimestampMixin
 
@@ -19,6 +24,6 @@ class Profile(Base, UUIDMixin, TimestampMixin):
     experience: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=list)
     projects: Mapped[dict | None] = mapped_column(JSONB, nullable=True, default=list)
     skills: Mapped[list | None] = mapped_column(ARRAY(String), nullable=True, default=list)
-    embedding = mapped_column(Vector(1536), nullable=True)
+    embedding = mapped_column(_EmbeddingType, nullable=True)
 
     user = relationship("User", back_populates="profile")
