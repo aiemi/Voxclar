@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Blog — Voxclar{% endblock %}</title>
+<meta name="description" content="{% block meta_description %}Insights on AI interview assistance, real-time transcription, and career technology from Voxclar.{% endblock %}">
+<meta name="keywords" content="{% block meta_keywords %}AI interview assistant, real-time transcription, speech recognition, meeting AI{% endblock %}">
+<meta name="author" content="Voxclar">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="{% block canonical %}https://voxclar.com/blog{% endblock %}">
+
+<!-- OpenGraph -->
+<meta property="og:site_name" content="Voxclar">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+<meta property="og:title" content="{% block og_title %}Blog — Voxclar{% endblock %}">
+<meta property="og:description" content="{% block og_description %}Insights on AI interview assistance and career technology.{% endblock %}">
+<meta property="og:url" content="{% block og_url %}https://voxclar.com/blog{% endblock %}">
+<meta property="og:image" content="{% block og_image %}https://voxclar.com/images/logo.png{% endblock %}">
+<meta property="og:locale" content="en_US">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{% block tw_title %}Blog — Voxclar{% endblock %}">
+<meta name="twitter:description" content="{% block tw_description %}Insights on AI interview assistance and career technology.{% endblock %}">
+<meta name="twitter:image" content="{% block tw_image %}https://voxclar.com/images/logo.png{% endblock %}">
+
+<!-- Favicon -->
+<link rel="icon" href="/favicon.ico">
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Voxclar",
+  "url": "https://voxclar.com",
+  "description": "AI-Powered Interview Assistant with real-time transcription and AI answers",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "https://voxclar.com/blog?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Voxclar",
+  "url": "https://voxclar.com",
+  "logo": "https://voxclar.com/images/logo.png",
+  "contactPoint": {
+    "@type": "ContactPoint",
+    "email": "service@voxclar.com",
+    "contactType": "customer support"
+  },
+  "sameAs": ["https://discord.gg/eXu9mfDh"]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Voxclar",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "macOS, Windows",
+  "offers": [
+    {"@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free — 10 min"},
+    {"@type": "Offer", "price": "19.99", "priceCurrency": "USD", "description": "Standard — 300 min/mo"},
+    {"@type": "Offer", "price": "49.99", "priceCurrency": "USD", "description": "Pro — 1000 min/mo"},
+    {"@type": "Offer", "price": "299", "priceCurrency": "USD", "description": "Lifetime — Unlimited"}
+  ],
+  "description": "AI-powered interview assistant with real-time transcription, invisible screen-share protection, and intelligent AI answers."
+}
+</script>
+{% endblock %}
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:#000;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;line-height:1.7;-webkit-font-smoothing:antialiased}
+a{color:#FFDD02;text-decoration:none;transition:color .2s}
+a:hover{color:#ffe94d}
+img{max-width:100%;height:auto}
+
+/* Header */
+.site-header{position:sticky;top:0;z-index:100;background:rgba(0,0,0,.85);backdrop-filter:blur(20px);border-bottom:1px solid #1a1a1a}
+.header-inner{max-width:1200px;margin:0 auto;padding:16px 24px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;color:#fff}
+.logo img{height:28px}
+.nav-links{display:flex;gap:28px;align-items:center}
+.nav-links a{color:#999;font-size:14px;font-weight:500;transition:color .2s}
+.nav-links a:hover,.nav-links a.active{color:#FFDD02}
+.nav-cta{background:#FFDD02;color:#000;padding:8px 20px;border-radius:8px;font-weight:600;font-size:13px}
+.nav-cta:hover{background:#ffe94d;color:#000}
+
+/* Main */
+.main{max-width:1200px;margin:0 auto;padding:40px 24px;min-height:70vh}
+
+/* Footer */
+.site-footer{border-top:1px solid #1a1a1a;padding:48px 24px 32px;margin-top:80px}
+.footer-inner{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:32px}
+.footer-brand{max-width:320px}
+.footer-brand h3{color:#fff;font-size:18px;margin-bottom:8px}
+.footer-brand p{color:#666;font-size:13px;line-height:1.6}
+.footer-links{display:flex;gap:48px}
+.footer-col h4{color:#999;font-size:12px;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.footer-col a{display:block;color:#666;font-size:13px;margin-bottom:8px}
+.footer-col a:hover{color:#FFDD02}
+.footer-bottom{max-width:1200px;margin:24px auto 0;padding-top:24px;border-top:1px solid #111;text-align:center;color:#444;font-size:12px}
+
+/* Blog Cards */
+.blog-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;margin-top:32px}
+.blog-card{background:#111;border:1px solid #1a1a1a;border-radius:16px;overflow:hidden;transition:transform .2s,border-color .2s}
+.blog-card:hover{transform:translateY(-4px);border-color:#333}
+.blog-card .cover{width:100%;height:200px;object-fit:cover;background:#0a0a0a}
+.blog-card .body{padding:20px}
+.blog-card .cat{display:inline-block;font-size:11px;color:#FFDD02;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600}
+.blog-card h3{font-size:17px;color:#fff;line-height:1.4;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.blog-card .excerpt{font-size:13px;color:#888;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.blog-card .meta{display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:12px;color:#555}
+
+/* Pagination */
+.pagination{display:flex;justify-content:center;gap:8px;margin-top:48px}
+.pagination a,.pagination span{padding:8px 16px;border-radius:8px;font-size:14px;border:1px solid #222}
+.pagination a{color:#ccc}
+.pagination a:hover{border-color:#FFDD02;color:#FFDD02}
+.pagination .current{background:#FFDD02;color:#000;border-color:#FFDD02;font-weight:600}
+
+/* Category filter */
+.categories{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.categories a{padding:6px 16px;border-radius:20px;font-size:13px;color:#888;border:1px solid #222;transition:all .2s}
+.categories a:hover,.categories a.active{color:#FFDD02;border-color:#FFDD02}
+
+/* Responsive */
+@media(max-width:900px){.blog-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){
+  .blog-grid{grid-template-columns:1fr}
+  .nav-links{display:none}
+  .footer-links{flex-direction:column;gap:24px}
+  .footer-inner{flex-direction:column}
+}
+
+/* Article page */
+.article-header{max-width:800px;margin:0 auto 40px;text-align:center}
+.article-header .cat{display:inline-block;font-size:12px;color:#FFDD02;text-transform:uppercase;letter-spacing:1.5px;font-weight:600;margin-bottom:16px}
+.article-header h1{font-size:36px;color:#fff;line-height:1.3;margin-bottom:16px}
+.article-header .subtitle{color:#888;font-size:15px;line-height:1.6}
+.article-meta{display:flex;justify-content:center;gap:24px;margin-top:16px;font-size:13px;color:#666}
+.article-cover{width:100%;max-width:800px;margin:0 auto 40px;border-radius:16px;overflow:hidden}
+.article-cover img{width:100%;height:auto;display:block}
+
+.article-body{max-width:760px;margin:0 auto;font-size:16px;line-height:1.85;color:#ccc}
+.article-body h2{font-size:24px;color:#fff;margin:48px 0 16px;padding-bottom:8px;border-bottom:1px solid #1a1a1a}
+.article-body h3{font-size:20px;color:#eee;margin:36px 0 12px}
+.article-body p{margin-bottom:20px}
+.article-body ul,.article-body ol{margin-bottom:20px;padding-left:24px}
+.article-body li{margin-bottom:8px}
+.article-body blockquote{border-left:3px solid #FFDD02;padding:16px 24px;margin:24px 0;background:#0a0a0a;border-radius:0 12px 12px 0;color:#aaa;font-style:italic}
+.article-body pre{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:12px;padding:20px;overflow-x:auto;margin:24px 0;font-size:14px;line-height:1.5}
+.article-body code{font-family:'SF Mono',Menlo,Monaco,monospace;font-size:.9em}
+.article-body :not(pre)>code{background:#1a1a1a;padding:2px 8px;border-radius:4px;color:#FFDD02}
+.article-body img{border-radius:12px;margin:24px 0;border:1px solid #1a1a1a}
+.article-body table{width:100%;border-collapse:collapse;margin:24px 0}
+.article-body th{text-align:left;padding:12px;border-bottom:2px solid #FFDD02;color:#fff;font-size:14px}
+.article-body td{padding:12px;border-bottom:1px solid #1a1a1a;font-size:14px}
+.article-body .info-box{background:linear-gradient(135deg,#0a0f1a,#0a1a0a);border:1px solid #1a3a1a;border-radius:12px;padding:20px;margin:24px 0}
+.article-body .info-box.warning{background:linear-gradient(135deg,#1a1500,#1a0f00);border-color:#3a2a00}
+.article-body .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin:24px 0}
+.article-body .stat-card{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:12px;padding:20px;text-align:center}
+.article-body .stat-card .number{font-size:32px;font-weight:700;color:#FFDD02;display:block}
+.article-body .stat-card .label{font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+
+/* Tags */
+.article-tags{max-width:760px;margin:40px auto;display:flex;gap:8px;flex-wrap:wrap}
+.article-tags a{padding:4px 14px;border-radius:16px;font-size:12px;color:#888;border:1px solid #222}
+.article-tags a:hover{border-color:#FFDD02;color:#FFDD02}
+
+/* Related posts */
+.related{max-width:1000px;margin:60px auto 0;padding-top:48px;border-top:1px solid #1a1a1a}
+.related h2{font-size:22px;color:#fff;margin-bottom:24px}
+.related .blog-grid{grid-template-columns:repeat(3,1fr)}
+
+/* CTA Banner */
+.cta-banner{max-width:800px;margin:60px auto 0;background:linear-gradient(135deg,#1a1400,#0a0a0a);border:1px solid #FFDD0233;border-radius:20px;padding:48px;text-align:center}
+.cta-banner h2{font-size:24px;color:#fff;margin-bottom:12px}
+.cta-banner p{color:#888;font-size:15px;margin-bottom:24px}
+.cta-banner .btn{display:inline-block;background:#FFDD02;color:#000;padding:12px 32px;border-radius:10px;font-weight:600;font-size:15px}
+.cta-banner .btn:hover{background:#ffe94d}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo">
+      <img src="/images/logo.png" alt="Voxclar">
+      Voxclar
+    </a>
+    <nav class="nav-links">
+      <a href="/#page2">Features</a>
+      <a href="/api">API</a>
+      <a href="/docs">Docs</a>
+      <a href="/blog" class="active">Blog</a>
+      <a href="/" class="nav-cta">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main class="main">
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <h3>Voxclar</h3>
+      <p>AI-powered interview assistant with real-time transcription, invisible screen-share protection, and intelligent answers. Your unfair advantage in every interview.</p>
+    </div>
+    <div class="footer-links">
+      <div class="footer-col">
+        <h4>Product</h4>
+        <a href="/#page2">Features</a>
+        <a href="/api">API</a>
+        <a href="/docs">Documentation</a>
+        <a href="/blog">Blog</a>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <a href="/terms">Terms of Service</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/security">Security</a>
+        <a href="mailto:service@voxclar.com">Contact</a>
+      </div>
+      <div class="footer-col">
+        <h4>Community</h4>
+        <a href="https://discord.gg/eXu9mfDh" target="_blank" rel="noopener">Discord</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    &copy; 2026 Voxclar. All rights reserved.
+  </div>
+</footer>
+
+</body>
+</html>

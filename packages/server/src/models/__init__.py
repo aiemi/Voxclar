@@ -8,8 +8,10 @@ from src.models.transaction import Transaction
 from src.models.subscription import Subscription
 from src.models.referral import Referral
 from src.models.license import License
+from src.models.blog import BlogPost
 
 __all__ = [
     "Base", "User", "Profile", "Meeting", "Transcript",
     "Answer", "Transaction", "Subscription", "Referral", "License",
+    "BlogPost",
 ]

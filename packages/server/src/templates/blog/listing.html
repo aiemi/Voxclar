@@ -1,0 +1,105 @@
+{% extends "blog/base.html" %}
+
+{% block title %}Blog — AI Interview Tips, Technology & Insights | Voxclar{% endblock %}
+{% block meta_description %}Expert insights on AI interview assistance, real-time transcription technology, career tips, and speech recognition. Stay ahead with Voxclar's blog.{% endblock %}
+{% block meta_keywords %}AI interview tips, real-time transcription blog, speech recognition technology, career advice AI, interview preparation{% endblock %}
+{% block canonical %}https://voxclar.com/blog{% if page > 1 %}?page={{ page }}{% endif %}{% endblock %}
+{% block og_title %}Blog — AI Interview Tips & Technology Insights | Voxclar{% endblock %}
+{% block og_description %}Expert insights on AI interview assistance, real-time transcription, and career technology.{% endblock %}
+{% block og_url %}https://voxclar.com/blog{% endblock %}
+{% block tw_title %}Blog — Voxclar{% endblock %}
+{% block tw_description %}Expert insights on AI interview assistance and career technology.{% endblock %}
+
+{% block structured_data %}
+{{ super() }}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Blog",
+  "name": "Voxclar Blog",
+  "url": "https://voxclar.com/blog",
+  "description": "Expert insights on AI interview assistance, real-time transcription technology, and career tips.",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Voxclar",
+    "logo": {"@type": "ImageObject", "url": "https://voxclar.com/images/logo.png"}
+  }
+}
+</script>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:48px">
+  <h1 style="font-size:36px;color:#fff;margin-bottom:12px">Blog</h1>
+  <p style="color:#888;font-size:16px;max-width:600px">Expert insights on AI-powered interviews, real-time transcription, and career technology.</p>
+</div>
+
+<!-- Category Filter -->
+<div class="categories">
+  <a href="/blog" class="{% if not current_category %}active{% endif %}">All</a>
+  {% for cat in categories %}
+  <a href="/blog?category={{ cat.category }}" class="{% if current_category == cat.category %}active{% endif %}">
+    {{ cat.category }} ({{ cat.count }})
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Blog Grid -->
+{% if posts %}
+<div class="blog-grid">
+  {% for post in posts %}
+  <a href="/blog/{{ post.slug }}" class="blog-card" style="text-decoration:none">
+    {% if post.cover_image %}
+    <img class="cover" src="{{ post.cover_image }}" alt="{{ post.title }}" loading="lazy">
+    {% else %}
+    <div class="cover" style="display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a1400,#0a0a0a)">
+      <span style="font-size:48px;opacity:.3">&#9997;</span>
+    </div>
+    {% endif %}
+    <div class="body">
+      <span class="cat">{{ post.category }}</span>
+      <h3>{{ post.title }}</h3>
+      <p class="excerpt">{{ post.excerpt }}</p>
+      <div class="meta">
+        <span>{{ post.published_at.strftime('%b %d, %Y') }}</span>
+        <span>{{ post.read_time }} min read</span>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% if page > 1 %}
+  <a href="/blog?page={{ page - 1 }}{% if current_category %}&category={{ current_category }}{% endif %}">&larr; Prev</a>
+  {% endif %}
+  {% for p in range(1, total_pages + 1) %}
+    {% if p == page %}
+    <span class="current">{{ p }}</span>
+    {% elif p <= 3 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+    <a href="/blog?page={{ p }}{% if current_category %}&category={{ current_category }}{% endif %}">{{ p }}</a>
+    {% elif p == 4 or p == total_pages - 2 %}
+    <span style="color:#444">...</span>
+    {% endif %}
+  {% endfor %}
+  {% if page < total_pages %}
+  <a href="/blog?page={{ page + 1 }}{% if current_category %}&category={{ current_category }}{% endif %}">Next &rarr;</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div style="text-align:center;padding:80px 0;color:#666">
+  <p style="font-size:18px">No posts yet. Check back soon!</p>
+</div>
+{% endif %}
+
+<!-- CTA -->
+<div class="cta-banner">
+  <h2>Ready to ace your next interview?</h2>
+  <p>Get real-time AI assistance, invisible to screen sharing. Try Voxclar free today.</p>
+  <a href="/" class="btn">Download Voxclar</a>
+</div>
+{% endblock %}
