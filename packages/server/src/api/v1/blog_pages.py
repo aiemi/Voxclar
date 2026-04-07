@@ -72,19 +72,21 @@ async def blog_post(request: Request, slug: str, db: AsyncSession = Depends(get_
             status_code=404,
         )
 
-    await blog_service.increment_view_count(db, post.id)
-    related = await blog_service.get_related_posts(db, slug, post.category)
-
-    # Pre-load all attributes to avoid async lazy-load in Jinja2 templates
+    # Pre-load all attributes BEFORE increment (avoids session expiry issues)
     post_dict = {
         "title": post.title, "slug": post.slug, "excerpt": post.excerpt,
         "content": post.content, "cover_image": post.cover_image,
-        "category": post.category, "tags": post.tags or [],
+        "category": post.category, "tags": list(post.tags or []),
         "meta_title": post.meta_title, "meta_description": post.meta_description,
-        "keywords": post.keywords or [], "author": post.author,
+        "keywords": list(post.keywords or []), "author": post.author,
         "read_time": post.read_time, "published_at": post.published_at,
-        "updated_at": post.updated_at, "view_count": post.view_count,
+        "updated_at": post.updated_at, "view_count": (post.view_count or 0) + 1,
     }
+    category = post.category
+    post_id = post.id
+
+    await blog_service.increment_view_count(db, post_id)
+    related = await blog_service.get_related_posts(db, slug, category)
     related_list = [
         {
             "title": r.title, "slug": r.slug, "excerpt": r.excerpt,
