@@ -32,9 +32,9 @@ async def blog_listing(
     total_pages = ceil(total / 12) if total else 0
 
     return templates.TemplateResponse(
+        request,
         "blog/listing.html",
         {
-            "request": request,
             "posts": posts,
             "categories": categories,
             "current_category": category,
@@ -65,8 +65,9 @@ async def blog_post(request: Request, slug: str, db: AsyncSession = Depends(get_
     related = await blog_service.get_related_posts(db, slug, post.category)
 
     return templates.TemplateResponse(
+        request,
         "blog/post.html",
-        {"request": request, "post": post, "related": related},
+        {"post": post, "related": related},
     )
 
 
