@@ -79,6 +79,8 @@ async def get_user_stats(
         total_duration_minutes=total_duration // 60,
         meetings_this_month=monthly,
         points_balance=user.points_balance,
+        topup_balance=user.topup_balance,
+        asr_balance=user.asr_balance,
         subscription_tier=user.subscription_tier,
     )
 

@@ -103,5 +103,6 @@ export interface UserStats {
   meetings_this_month: number
   points_balance: number
   topup_balance: number
+  asr_balance: number
   subscription_tier: string
 }

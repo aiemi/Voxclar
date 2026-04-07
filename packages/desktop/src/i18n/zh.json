@@ -18,6 +18,8 @@
     "free_plan": "免费计划",
     "plan_suffix": "计划",
     "stats": { "meetings": "会议次数", "hours": "总时长", "points": "积分余额" },
+    "cloud_asr": "云端ASR分钟数",
+    "buy_asr_minutes": "购买更多分钟",
     "engine_status": "引擎状态",
     "features": {
       "captions": "实时字幕",

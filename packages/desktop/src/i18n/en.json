@@ -18,6 +18,8 @@
     "free_plan": "Free Plan",
     "plan_suffix": "Plan",
     "stats": { "meetings": "Meetings", "hours": "Total Hours", "points": "Points Balance" },
+    "cloud_asr": "Cloud ASR Minutes",
+    "buy_asr_minutes": "Buy more minutes",
     "engine_status": "Engine Status",
     "features": {
       "captions": "Real-time Captions",
