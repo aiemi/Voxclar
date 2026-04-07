@@ -1154,18 +1154,16 @@ POSTS.append({
 </ul>
 
 <h2>Architecture Overview</h2>
-<pre><code class="language-python">"""
-Client                    Server                    ASR Provider
+<pre><code>Client                    Server                    ASR Provider
   |                         |                          |
-  |-- audio chunk --------->|                          |
-  |                         |-- forward audio -------->|
-  |                         |<-- interim transcript ---|
-  |<-- interim result ------|                          |
-  |-- audio chunk --------->|                          |
-  |                         |-- forward audio -------->|
-  |                         |<-- final transcript -----|
-  |<-- final result --------|                          |
-"""
+  |-- audio chunk ----------&gt;|                          |
+  |                         |-- forward audio ---------&gt;|
+  |                         |&lt;-- interim transcript ---|
+  |&lt;-- interim result ------|                          |
+  |-- audio chunk ----------&gt;|                          |
+  |                         |-- forward audio ---------&gt;|
+  |                         |&lt;-- final transcript -----|
+  |&lt;-- final result --------|                          |
 </code></pre>
 
 <h2>Server Implementation with FastAPI</h2>
@@ -1328,8 +1326,8 @@ POSTS.append({
 
 <pre><code class="language-python">import re
 
-def detect_question(transcript: str) -> dict:
-    """Basic question detection with classification."""
+def detect_question(transcript: str) -&gt; dict:
+    # Basic question detection with classification
     question_patterns = {
         "behavioral": r"(tell me about a time|describe a situation|give an example)",
         "technical": r"(how would you|what is|explain|implement|design)",
@@ -1383,22 +1381,18 @@ def detect_question(transcript: str) -> dict:
 <h2>Prompt Engineering for Interview Answers</h2>
 <p>The prompt engineering behind interview answer generation is sophisticated. A simplified version of the system prompt might look like:</p>
 
-<pre><code class="language-python">system_prompt = """You are an expert interview coach helping a candidate
-answer interview questions in real time.
-
-Candidate Profile:
-{resume_summary}
-
-Job Description:
-{job_description}
-
-Instructions:
-- For behavioral questions, use the STAR method
-- Include specific metrics when available
-- Keep answers concise (under 2 minutes spoken)
-- Suggest 2-3 bullet points, not a full script
-- Reference the candidate's actual experience
-"""
+<pre><code class="language-python">system_prompt = (
+    "You are an expert interview coach helping a candidate "
+    "answer interview questions in real time.\\n\\n"
+    "Candidate Profile:\\n{resume_summary}\\n\\n"
+    "Job Description:\\n{job_description}\\n\\n"
+    "Instructions:\\n"
+    "- For behavioral questions, use the STAR method\\n"
+    "- Include specific metrics when available\\n"
+    "- Keep answers concise (under 2 minutes spoken)\\n"
+    "- Suggest 2-3 bullet points, not a full script\\n"
+    "- Reference the candidate actual experience"
+)
 </code></pre>
 
 <div class="info-box">
@@ -1874,7 +1868,7 @@ POSTS.append({
 import numpy as np
 
 def find_loopback_device(p: pyaudio.PyAudio):
-    """Find the default loopback device for WASAPI."""
+    # Find the default loopback device for WASAPI
     wasapi_info = p.get_host_api_info_by_type(pyaudio.paWASAPI)
 
     default_speakers = p.get_device_info_by_index(
