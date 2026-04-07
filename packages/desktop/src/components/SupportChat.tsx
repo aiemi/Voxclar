@@ -7,25 +7,44 @@ const BASE_URL: string = import.meta.env.VITE_API_URL || 'http://localhost:8001/
 
 /** Lightweight markdown → HTML for chat messages */
 function renderMarkdown(text: string): string {
-  return text
-    // Code blocks (```)
-    .replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+  let html = text
+    // Code blocks
+    .replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre style="background:rgba(255,255,255,0.05);padding:8px 12px;border-radius:8px;margin:8px 0;overflow-x:auto;font-size:0.85em"><code>$2</code></pre>')
     // Inline code
     .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:0.85em">$1</code>')
     // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#fff">$1</strong>')
     // Italic
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Headings (### or ##)
+    .replace(/^#{2,3}\s+(.+)$/gm, '<div style="font-weight:600;color:#fff;margin:10px 0 4px">$1</div>')
     // Numbered lists
-    .replace(/^\d+\.\s+(.+)$/gm, '<li style="margin-left:16px;list-style:decimal">$1</li>')
-    // Bullet lists
-    .replace(/^[-•]\s+(.+)$/gm, '<li style="margin-left:16px;list-style:disc">$1</li>')
+    .replace(/^\d+\.\s+(.+)$/gm, '<li style="margin-left:18px;list-style:decimal;margin-bottom:2px">$1</li>')
+    // Bullet lists (with sub-items)
+    .replace(/^ {2,}[-•]\s+(.+)$/gm, '<li style="margin-left:32px;list-style:circle;margin-bottom:1px;font-size:0.95em">$1</li>')
+    .replace(/^[-•]\s+(.+)$/gm, '<li style="margin-left:18px;list-style:disc;margin-bottom:2px">$1</li>')
     // Wrap consecutive <li> in <ul>
-    .replace(/((?:<li[^>]*>.*?<\/li>\n?)+)/g, '<ul style="margin:4px 0;padding:0">$1</ul>')
-    // Line breaks
-    .replace(/\n/g, '<br>')
-    // Clean up double <br> after </ul>
-    .replace(/<\/ul><br>/g, '</ul>')
+    .replace(/((?:<li[^>]*>.*?<\/li>\n?)+)/g, '<ul style="margin:6px 0;padding:0">$1</ul>')
+
+  // Paragraphs: split on double newlines, wrap non-tag content in <p>
+  html = html
+    .split(/\n{2,}/)
+    .map(block => {
+      const trimmed = block.trim()
+      if (!trimmed) return ''
+      if (trimmed.startsWith('<ul') || trimmed.startsWith('<pre') || trimmed.startsWith('<div')) return trimmed
+      return `<p style="margin:0 0 8px">${trimmed.replace(/\n/g, '<br>')}</p>`
+    })
+    .join('')
+
+  // Single newlines within remaining text
+  html = html.replace(/([^>])\n([^<])/g, '$1<br>$2')
+
+  // Clean up
+  html = html.replace(/<\/ul><br>/g, '</ul>')
+  html = html.replace(/<p style="margin:0 0 8px"><\/p>/g, '')
+
+  return html
 }
 
 interface Message {
