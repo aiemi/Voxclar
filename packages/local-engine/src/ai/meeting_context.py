@@ -112,7 +112,26 @@ class MeetingContext:
         return "\n".join(parts)
 
     def _build_user_message(self, question: str) -> str:
-        return f"Answer this interview question:\n{question}"
+        lang = self._detect_language(question)
+        lang_instruction = {
+            "en": "You MUST answer in English.",
+            "zh": "你必须用中文回答。",
+            "ja": "日本語で回答してください。",
+        }.get(lang, "Answer in the same language as the question.")
+        return f"{lang_instruction}\n\nAnswer this question:\n{question}"
+
+    @staticmethod
+    def _detect_language(text: str) -> str:
+        chinese_count = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+        japanese_count = sum(1 for c in text if '\u3040' <= c <= '\u30ff' or '\u31f0' <= c <= '\u31ff')
+        total = len(text.strip())
+        if total == 0:
+            return "en"
+        if japanese_count > 2:
+            return "ja"
+        if chinese_count / max(total, 1) > 0.15:
+            return "zh"
+        return "en"
 
     def reset(self):
         """会议结束，清空。"""
@@ -131,10 +150,13 @@ SYSTEM_PROMPTS = {
     "general": """You are Voxclar AI — a real-time interview assistant running in the background.
 Your job: help the user answer questions during a live meeting/interview.
 
+CRITICAL RULE — LANGUAGE:
+- You MUST reply in the SAME LANGUAGE as the question. English question → English answer. Chinese question → Chinese answer.
+- NEVER switch language because of the user's profile/resume language. The question's language decides your response language.
+
 Rules:
 - Be CONCISE — the user needs to read your answer FAST while talking
 - Use bullet points for structure
-- Match the language of the question (Chinese question → Chinese answer)
 - If user profile/resume is provided, incorporate SPECIFIC experiences and achievements
 - Keep answers under 150 words
 - Sound natural, not robotic — the user will paraphrase your answer verbally""",
@@ -144,7 +166,7 @@ Rules:
 - Concise, professional answers (under 200 words)
 - Highlight specific experience from the user's resume
 - Use STAR method when describing experiences (Situation, Task, Action, Result)
-- Match the question's language
+- IMPORTANT: Reply in the same language as the question
 - Focus on relevance to the role""",
 
     "technical": """You are Voxclar AI helping in a technical interview.
@@ -154,7 +176,7 @@ Rules:
 - Mention trade-offs and alternatives
 - Use code snippets only if essential (keep them short)
 - Under 300 words
-- Match the question's language""",
+- IMPORTANT: Reply in the same language as the question""",
 
     "behavioral": """You are Voxclar AI helping with a behavioral interview question.
 Rules:
@@ -163,7 +185,7 @@ Rules:
 - Use "I" not "we" — make it personal
 - Include metrics/numbers when possible
 - Under 250 words
-- Match the question's language""",
+- IMPORTANT: Reply in the same language as the question""",
 
     "coffee_chat": """You are Voxclar AI helping in a casual professional coffee chat.
 Rules:
@@ -171,7 +193,7 @@ Rules:
 - Show genuine interest and industry knowledge
 - Reference the user's background naturally
 - Under 150 words
-- Match the question's language""",
+- IMPORTANT: Reply in the same language as the question""",
 
     "project_kickoff": """You are Voxclar AI helping in a project kickoff meeting.
 Rules:

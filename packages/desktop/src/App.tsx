@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff, Mail } from 'lucide-react'
@@ -21,6 +21,21 @@ import CaptionOverlay from '@/components/CaptionOverlay'
 
 function AuthenticatedApp() {
   useEngine()
+  const storeLogout = useAuthStore((s) => s.logout)
+  const storeLogin = useAuthStore((s) => s.login)
+
+  // Validate token on mount — if invalid, force logout
+  useEffect(() => {
+    api.getCurrentUser().then((user) => {
+      const token = localStorage.getItem('access_token')
+      const refresh = localStorage.getItem('refresh_token')
+      if (token && refresh) {
+        storeLogin(user, token, refresh)
+      }
+    }).catch(() => {
+      storeLogout()
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex h-screen bg-imeet-black">
