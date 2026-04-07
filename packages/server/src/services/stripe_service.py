@@ -133,7 +133,7 @@ async def create_checkout_session(
 
     customer_id = await get_or_create_stripe_customer(db, user)
     # Payment result page served by backend (not the Electron app)
-    backend_url = "http://localhost:8001"
+    backend_url = settings.BACKEND_URL
 
     if plan_id == "standard":
         if not settings.STRIPE_STANDARD_PRICE_ID:
@@ -529,7 +529,7 @@ async def create_portal_session(db: AsyncSession, user_id: str) -> str:
 
     portal = stripe.billing_portal.Session.create(
         customer=user.stripe_customer_id,
-        return_url="http://localhost:8001/payment/result?success=true",
+        return_url=f"{settings.BACKEND_URL}/payment/result?success=true",
     )
     return portal.url
 

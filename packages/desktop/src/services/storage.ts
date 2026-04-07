@@ -32,7 +32,8 @@ export async function loadProfile(): Promise<any> {
     try {
       const profile = await api.getCurrentUser()
       // Also try server profile
-      const res = await fetch(`http://localhost:8001/api/v1/profiles/me`, {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
+      const res = await fetch(`${apiBase}/profiles/me`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` },
       })
       if (res.ok) return await res.json()

@@ -1,6 +1,6 @@
 import type { User, Meeting, UserStats, Transaction } from '@/types'
 
-const BASE_URL = 'http://localhost:8001/api/v1'
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('access_token')

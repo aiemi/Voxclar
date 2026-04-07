@@ -50,7 +50,10 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
 
-    # Frontend URL (for Stripe redirect)
+    # Backend URL (for Stripe redirect pages)
+    BACKEND_URL: str = "http://localhost:8001"
+
+    # Frontend URL
     FRONTEND_URL: str = "http://localhost:5173"
 
     # CORS
