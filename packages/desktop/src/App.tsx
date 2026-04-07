@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Eye, EyeOff, Mail } from 'lucide-react'
@@ -65,6 +65,7 @@ function LoginPage() {
   // Verification code step
   const [codeSent, setCodeSent] = useState(false)
   const [verifyCode, setVerifyCode] = useState('')
+  const [showTermsMore, setShowTermsMore] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -152,7 +153,7 @@ function LoginPage() {
       <div className="drag-region h-10 flex-shrink-0" />
 
       <div className="flex-1 flex items-center justify-center">
-        <div className="w-[420px]">
+        <div className="w-full max-w-[420px] px-4 sm:px-0">
           {/* Logo */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold mb-2 font-brand">
@@ -164,7 +165,7 @@ function LoginPage() {
           </div>
 
           {/* Card */}
-          <div className="bg-[#1a1a1a]/80 backdrop-blur-2xl rounded-[20px_20px_4px_20px] p-8 border border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
+          <div className="bg-[#1a1a1a]/80 backdrop-blur-2xl rounded-[20px_20px_4px_20px] p-5 sm:p-8 border border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,0.3)]">
             <h2 className="text-lg font-semibold text-center mb-6">
               {isRegister ? t('auth.register') : t('auth.login')}
             </h2>
@@ -193,7 +194,7 @@ function LoginPage() {
                     placeholder={t('auth.code_placeholder')}
                     required
                     maxLength={6}
-                    className="input-field w-full text-center text-2xl tracking-[0.5em] font-mono"
+                    className="input-field w-full text-center text-xl sm:text-2xl tracking-[0.3em] sm:tracking-[0.5em] font-mono"
                     autoFocus
                   />
                   <button
@@ -292,7 +293,12 @@ function LoginPage() {
                           <Link to="/privacy" className="text-imeet-gold hover:underline">{t('auth.privacy')}</Link>
                           {' '}{t('auth.agree_and')}{' '}
                           <Link to="/security" className="text-imeet-gold hover:underline">{t('auth.security')}</Link>
-                          . {t('auth.disclaimer')}
+                          .{' '}
+                          {!showTermsMore ? (
+                            <button type="button" onClick={() => setShowTermsMore(true)} className="text-imeet-gold hover:underline">more</button>
+                          ) : (
+                            <span className="text-white/30">{t('auth.disclaimer')}</span>
+                          )}
                         </span>
                       </label>
                     </>

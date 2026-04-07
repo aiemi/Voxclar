@@ -174,9 +174,9 @@ export default function MeetingRecordPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-7rem)] flex gap-5">
+    <div className="h-[calc(100vh-7rem)] flex flex-col md:flex-row gap-5">
       {/* Left: Meeting List */}
-      <div className="w-60 flex-shrink-0 flex flex-col gap-2">
+      <div className="w-full md:w-60 flex-shrink-0 flex flex-col gap-2 max-h-[30vh] md:max-h-none overflow-y-auto">
         <h3 className="text-sm font-semibold text-imeet-gold mb-1">{t('records.history')}</h3>
 
         <div className="flex-1 overflow-y-auto space-y-1.5">

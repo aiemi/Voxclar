@@ -253,7 +253,7 @@ export default function Settings() {
               <label className="text-xs text-imeet-text-muted uppercase tracking-wider mb-1.5 block">
                 {t('settings.preferred_model')}
               </label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {[
                   { value: 'auto', label: t('settings.model_auto'), desc: t('settings.model_auto_label') },
                   { value: 'claude', label: 'Claude', desc: 'Anthropic' },

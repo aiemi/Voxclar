@@ -52,7 +52,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-[#1a1a1a] rounded-[20px_4px_20px_20px] border border-white/[0.08] p-5 hover:-translate-y-1 transition-transform duration-300">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
@@ -77,7 +77,7 @@ export default function Dashboard() {
       </div>
 
       {/* Feature Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[
           { icon: Zap, titleKey: 'dashboard.features.captions', descKey: 'dashboard.features.captions_desc', radius: '20px 20px 4px 20px' },
           { icon: Brain, titleKey: 'dashboard.features.ai_answers', descKey: 'dashboard.features.ai_answers_desc', radius: '20px 4px 20px 20px' },

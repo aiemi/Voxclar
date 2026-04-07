@@ -159,7 +159,7 @@ export default function Subscription() {
       )}
 
       {/* Plans Grid */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {PLANS.map((plan) => {
           const isCurrent = currentTier === plan.tier
           const Icon = plan.icon
@@ -242,7 +242,7 @@ export default function Subscription() {
       </div>
 
       {/* Top-up + Manage */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {currentTier === 'lifetime' ? (
           <div className="bg-imeet-panel rounded-[20px_4px_20px_20px] p-5 border border-purple-500/30">
             <div className="flex items-center justify-between mb-3">
@@ -327,7 +327,7 @@ export default function Subscription() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
             <p className="text-xs text-imeet-text-muted mb-2 uppercase tracking-wider">{t('subscription.invite_code')}</p>
             <div className="flex items-center gap-2">

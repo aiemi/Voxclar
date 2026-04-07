@@ -244,7 +244,7 @@ export default function Meeting() {
         </div>
 
         {/* Live Status Cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-4 border border-imeet-border text-center">
             <Mic size={20} className="text-green-400 mx-auto mb-2" />
             <p className="text-2xl font-bold">{store.transcripts.filter(t => t.speaker === 'other').length || 0}</p>
@@ -282,7 +282,7 @@ export default function Meeting() {
   }
 
   return (
-    <div className="h-full flex gap-6 items-center">
+    <div className="h-full flex flex-col lg:flex-row gap-6 items-center overflow-y-auto">
       {/* Left: Setup Form */}
       <div className="flex-1 self-stretch flex flex-col justify-center">
         <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-6 border border-imeet-border space-y-4">
@@ -355,7 +355,7 @@ export default function Meeting() {
       </div>
 
       {/* Right: How it works */}
-      <div className="w-80 flex-shrink-0 space-y-4 self-stretch flex flex-col justify-center">
+      <div className="w-full lg:w-80 flex-shrink-0 space-y-4 self-stretch flex flex-col justify-center">
         <div className="bg-imeet-panel rounded-[20px_20px_4px_20px] p-5 border border-imeet-border">
           <h3 className="text-sm font-semibold text-imeet-gold mb-4">{t('meeting.how_it_works')}</h3>
           <div className="space-y-4">
