@@ -152,8 +152,8 @@ function LoginPage() {
       {/* Frameless window drag area */}
       <div className="drag-region h-10 flex-shrink-0" />
 
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-full max-w-[420px] px-4 sm:px-0">
+      <div className="flex-1 overflow-y-auto flex items-center justify-center py-6">
+        <div className="w-full max-w-[420px] px-4 sm:px-0 my-auto">
           {/* Logo */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold mb-2 font-brand">
