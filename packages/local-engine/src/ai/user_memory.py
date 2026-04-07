@@ -20,7 +20,6 @@
   当前准备资料 > 用户 profile > 最近会议记忆 > 历史会议记忆
 """
 import logging
-import json
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)

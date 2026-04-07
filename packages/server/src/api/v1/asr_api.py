@@ -1,13 +1,11 @@
 """Public Voxclar Cloud ASR API — authenticates via API key, proxies to Deepgram."""
 import asyncio
 import json
-import os
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request, HTTPException, Header
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.dependencies import get_db
 from src.models.user import User
 from src.config import get_settings
 

@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,10 +8,9 @@ from src.core.security import (
     create_access_token, create_refresh_token,
     decode_refresh_token, verify_google_token,
 )
-from src.core.exceptions import BadRequest, Unauthorized, Conflict, NotFound
+from src.core.exceptions import Unauthorized, Conflict
 from src.models.user import User
 from src.models.profile import Profile
-from src.models.referral import Referral, ReferralStatus
 from src.models.transaction import Transaction, TransactionType
 
 

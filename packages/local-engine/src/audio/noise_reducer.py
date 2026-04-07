@@ -29,7 +29,7 @@ class AdaptiveNoiseReducer:
 
     def _init_deepfilter(self):
         try:
-            from df.enhance import enhance, init_df
+            from df.enhance import init_df
             self._df_model, self._df_state, _ = init_df()
             self._deepfilter = True
             logger.info("DeepFilterNet initialized successfully")

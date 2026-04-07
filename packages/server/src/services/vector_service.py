@@ -2,7 +2,7 @@
 import uuid
 
 from openai import AsyncOpenAI
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
@@ -58,7 +58,7 @@ async def update_profile_embedding(db: AsyncSession, user_id: str) -> None:
 async def search_experience(
     db: AsyncSession, user_id: str, query: str, top_k: int = 5
 ) -> list[dict]:
-    query_embedding = await get_embedding(query)
+    await get_embedding(query)
 
     result = await db.execute(
         select(Profile).where(Profile.user_id == uuid.UUID(user_id))

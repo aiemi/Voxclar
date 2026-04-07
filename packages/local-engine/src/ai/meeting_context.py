@@ -102,12 +102,12 @@ class MeetingContext:
                     # 只保留回答的前 200 字符
                     history_lines.append(f"A: {qa.answer[:200]}...")
             if history_lines:
-                parts.append(f"\n\n[PREVIOUS Q&A IN THIS MEETING]\n" + "\n".join(history_lines))
+                parts.append("\n\n[PREVIOUS Q&A IN THIS MEETING]\n" + "\n".join(history_lines))
 
         # 用户自己说的话 — 让 AI 知道用户在聊什么
         if self.user_utterances:
             recent = list(self.user_utterances)[-5:]  # 最近 5 条
-            parts.append(f"\n\n[WHAT THE USER HAS SAID RECENTLY]\n" + "\n".join(recent))
+            parts.append("\n\n[WHAT THE USER HAS SAID RECENTLY]\n" + "\n".join(recent))
 
         return "\n".join(parts)
 

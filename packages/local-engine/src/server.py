@@ -17,7 +17,7 @@ if _env_path.exists():
                 key, _, value = line.partition("=")
                 os.environ.setdefault(key.strip(), value.strip())
 
-from src.engine import MeetingEngine
+from src.engine import MeetingEngine  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +190,9 @@ def parse_file_content(file_bytes: bytes, filename: str) -> str:
 
         elif name_lower.endswith(('.docx', '.doc')):
             # docx 是 zip 格式，提取 XML 中的文本
-            import io, zipfile, re
+            import io
+            import zipfile
+            import re
             with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
                 if 'word/document.xml' in z.namelist():
                     xml = z.read('word/document.xml').decode('utf-8', errors='ignore')
@@ -199,7 +201,9 @@ def parse_file_content(file_bytes: bytes, filename: str) -> str:
             return ""
 
         elif name_lower.endswith(('.pptx', '.ppt')):
-            import io, zipfile, re
+            import io
+            import zipfile
+            import re
             texts = []
             with zipfile.ZipFile(io.BytesIO(file_bytes)) as z:
                 for name in sorted(z.namelist()):

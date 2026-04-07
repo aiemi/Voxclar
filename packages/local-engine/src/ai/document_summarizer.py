@@ -7,7 +7,6 @@
 """
 import logging
 import os
-from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,7 @@
 """Adaptive routing - benchmarks hardware and network to choose ASR strategy."""
 import logging
 import platform
-import time
 
-import numpy as np
 
 logger = logging.getLogger(__name__)
 

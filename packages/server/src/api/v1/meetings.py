@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.dependencies import get_db, get_current_user_id
 from src.schemas.meeting import MeetingCreate, MeetingUpdate, MeetingResponse, MeetingListResponse, MeetingSyncRequest
-from src.schemas.transcript import TranscriptResponse, TranscriptListResponse
+from src.schemas.transcript import TranscriptListResponse
 from src.services import meeting_service, sync_service
 
 router = APIRouter()

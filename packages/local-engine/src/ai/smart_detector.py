@@ -11,7 +11,6 @@ LLM 调用极轻量：输入 ~100 tokens，输出 ~10 tokens。
 """
 import logging
 import os
-from typing import Optional
 
 from src.ai.question_detector import LocalQuestionDetector
 

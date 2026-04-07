@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import get_settings
 from src.core.exceptions import BadRequest, NotFound
 from src.models.user import User, SubscriptionTier
-from src.models.subscription import Subscription, SubscriptionPlan
+from src.models.subscription import Subscription
 from src.models.transaction import Transaction, TransactionType
 from src.models.license import License
 
@@ -248,7 +248,7 @@ async def handle_checkout_completed(db: AsyncSession, session: dict):
     elif plan == "lifetime":
         # Fetch the license key we just created
         lic_result = await db.execute(
-            select(License).where(License.user_id == user.id, License.is_active == True)
+            select(License).where(License.user_id == user.id, License.is_active is True)
         )
         lic = lic_result.scalar_one_or_none()
         asyncio.create_task(send_lifetime_email(
@@ -284,7 +284,7 @@ async def handle_invoice_paid(db: AsyncSession, invoice: dict):
     sub_result = await db.execute(
         select(Subscription).where(
             Subscription.payment_subscription_id == sub_id,
-            Subscription.is_active == True,
+            Subscription.is_active is True,
         )
     )
     subscription = sub_result.scalar_one_or_none()
@@ -367,7 +367,7 @@ async def _activate_subscription(
     old_subs = await db.execute(
         select(Subscription).where(
             Subscription.user_id == user.id,
-            Subscription.is_active == True,
+            Subscription.is_active is True,
         )
     )
     for old in old_subs.scalars().all():
@@ -472,7 +472,7 @@ async def activate_license(
     result = await db.execute(
         select(License).where(
             License.user_id == uuid.UUID(user_id),
-            License.is_active == True,
+            License.is_active is True,
         )
     )
     license_record = result.scalar_one_or_none()
@@ -497,7 +497,7 @@ async def verify_license(db: AsyncSession, user_id: str, device_id: str) -> dict
     result = await db.execute(
         select(License).where(
             License.user_id == uuid.UUID(user_id),
-            License.is_active == True,
+            License.is_active is True,
         )
     )
     license_record = result.scalar_one_or_none()

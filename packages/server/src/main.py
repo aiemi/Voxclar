@@ -56,7 +56,7 @@ async def health_check():
     return {"status": "healthy", "version": "2.0.0"}
 
 
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse  # noqa: E402
 
 @app.get("/payment/result", response_class=HTMLResponse)
 async def payment_result(success: str = "", cancelled: str = "", lifetime: str = "", topup: str = ""):

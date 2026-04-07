@@ -144,7 +144,7 @@ class LocalQuestionDetector:
 
     def _check_question_words(self, text: str, lang: str) -> float:
         words = EN_QUESTION_WORDS if lang == "en" else ZH_QUESTION_WORDS
-        first_word = text.split()[0] if text.split() else ""
+        text.split()[0] if text.split() else ""
 
         # Question word at start
         for qw in words:

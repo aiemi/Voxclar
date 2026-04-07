@@ -14,7 +14,7 @@ import uuid
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.exceptions import BadRequest, NotFound
+from src.core.exceptions import BadRequest
 from src.models.referral import Referral, ReferralStatus
 from src.models.user import User
 from src.models.transaction import Transaction, TransactionType
@@ -141,7 +141,7 @@ async def apply_referral_code(
             )
         )
         if fp_check.scalar_one_or_none():
-            logger.warning(f"Referral blocked: duplicate device fingerprint")
+            logger.warning("Referral blocked: duplicate device fingerprint")
             return False
 
     # ── 通过检查，创建新的推荐记录并发放推荐人奖励 ──
@@ -180,7 +180,7 @@ async def grant_referrer_bonus(db: AsyncSession, paying_user_id: str):
         select(Referral).where(
             Referral.referred_id == uuid.UUID(paying_user_id),
             Referral.status == ReferralStatus.registered,
-            Referral.referrer_bonus_granted == False,
+            Referral.referrer_bonus_granted is False,
         )
     )
     referral = result.scalar_one_or_none()

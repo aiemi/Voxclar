@@ -136,7 +136,7 @@ def _info_row(label: str, value: str) -> str:
 </tr>'''
 
 def _info_table(rows: list[tuple[str, str]]) -> str:
-    inner = "".join(_info_row(l, v) for l, v in rows)
+    inner = "".join(_info_row(label, val) for label, val in rows)
     return f'<table cellpadding="0" cellspacing="0" border="0" style="margin:16px 0;width:100%;">{inner}</table>'
 
 def _divider() -> str:
@@ -156,9 +156,9 @@ async def send_verification_code(email: str, code: str):
     body = (
         _heading("Verify Your Email")
         + _text("Enter this code in the app to complete your registration:")
-        + f'<div style="margin:24px 0;text-align:center;">'
+        + '<div style="margin:24px 0;text-align:center;">'
         + f'<span style="font-size:36px;font-weight:700;letter-spacing:12px;color:#ffdd02;font-family:monospace;background:#2a2500;padding:16px 32px;border-radius:12px;border:2px solid #3d3600;display:inline-block;">{code}</span>'
-        + f'</div>'
+        + '</div>'
         + _text("This code expires in <strong style=\"color:#e0e0e0;\">10 minutes</strong>. If you didn't request this, ignore this email.")
     )
     html = _base_template("Verify Your Email", body)
@@ -188,7 +188,7 @@ async def send_welcome_email(email: str, username: str):
 async def send_subscription_email(email: str, username: str, plan: str, minutes: int, price: float):
     plan_display = plan.capitalize()
     body = (
-        _heading(f"Subscription Activated!")
+        _heading("Subscription Activated!")
         + _text(f"Hi {username}, your {_gold_text(plan_display)} plan is now active. Thank you for your purchase!")
         + _info_table([
             ("Plan", plan_display),
@@ -288,9 +288,9 @@ async def send_asr_topup_email(email: str, username: str, minutes: int, price: f
     if api_key:
         api_section = (
             _divider()
-            + _text(f'Your API key has been generated:')
+            + _text('Your API key has been generated:')
             + f'<p style="margin:8px 0 16px;font-family:monospace;font-size:13px;color:#ffdd02;background:#2a2500;padding:12px 16px;border-radius:8px;border:1px solid #3d3600;word-break:break-all;">{api_key}</p>'
-            + _text(f'API Endpoint: <code style="color:#aaaaaa;">https://api.voxclar.com/v1/listen</code>')
+            + _text('API Endpoint: <code style="color:#aaaaaa;">https://api.voxclar.com/v1/listen</code>')
             + _button(f"{WEBSITE_URL}/docs", "View API Docs", "#9333ea", "#ffffff")
         )
 
