@@ -47,19 +47,28 @@
   "build": {
     "appId": "com.voxclar.desktop",
     "productName": "Voxclar",
-    "icon": "icon.icns",
+    "directories": {
+      "buildResources": "build"
+    },
     "mac": {
       "category": "public.app-category.productivity",
-      "icon": "icon.icns",
+      "icon": "build/icon.icns",
       "target": [
         "dmg",
         "zip"
       ]
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis",
         "zip"
+      ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "target": [
+        "AppImage"
       ]
     }
   }
