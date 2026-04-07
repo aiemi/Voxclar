@@ -31,11 +31,22 @@ async def blog_listing(
     categories = await blog_service.get_categories(db)
     total_pages = ceil(total / 12) if total else 0
 
+    # Pre-load attributes to avoid async lazy-load in Jinja2
+    posts_list = [
+        type("P", (), {
+            "title": p.title, "slug": p.slug, "excerpt": p.excerpt,
+            "cover_image": p.cover_image, "category": p.category,
+            "tags": p.tags or [], "published_at": p.published_at,
+            "read_time": p.read_time,
+        })()
+        for p in posts
+    ]
+
     return templates.TemplateResponse(
         request,
         "blog/listing.html",
         {
-            "posts": posts,
+            "posts": posts_list,
             "categories": categories,
             "current_category": category,
             "page": page,
@@ -64,10 +75,29 @@ async def blog_post(request: Request, slug: str, db: AsyncSession = Depends(get_
     await blog_service.increment_view_count(db, post.id)
     related = await blog_service.get_related_posts(db, slug, post.category)
 
+    # Pre-load all attributes to avoid async lazy-load in Jinja2 templates
+    post_dict = {
+        "title": post.title, "slug": post.slug, "excerpt": post.excerpt,
+        "content": post.content, "cover_image": post.cover_image,
+        "category": post.category, "tags": post.tags or [],
+        "meta_title": post.meta_title, "meta_description": post.meta_description,
+        "keywords": post.keywords or [], "author": post.author,
+        "read_time": post.read_time, "published_at": post.published_at,
+        "updated_at": post.updated_at, "view_count": post.view_count,
+    }
+    related_list = [
+        {
+            "title": r.title, "slug": r.slug, "excerpt": r.excerpt,
+            "cover_image": r.cover_image, "category": r.category,
+            "published_at": r.published_at, "read_time": r.read_time,
+        }
+        for r in related
+    ]
+
     return templates.TemplateResponse(
         request,
         "blog/post.html",
-        {"post": post, "related": related},
+        {"post": type("P", (), post_dict)(), "related": [type("R", (), r)() for r in related_list]},
     )
 
 
