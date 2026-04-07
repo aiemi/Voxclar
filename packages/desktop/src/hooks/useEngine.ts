@@ -145,23 +145,39 @@ export function useEngine() {
       memoryData = loadMemory()
     } catch {}
 
-    // Lifetime users: load API keys and ASR mode preference
+    // Determine ASR mode and AI routing based on subscription tier
+    const { useAuthStore } = await import('@/stores/authStore')
+    const user = useAuthStore.getState().user
+    const isLifetime = user?.subscription_tier === 'lifetime'
+    const isSubscriber = user?.subscription_tier === 'standard' || user?.subscription_tier === 'pro'
+
     let asrMode = 'deepgram'
     let userApiKeys: Record<string, string> | undefined
     let aiModel = 'auto'
-    try {
-      const { loadLifetimeConfig } = await import('@/services/storage')
-      const lc = loadLifetimeConfig()
-      if (lc) {
-        // Lifetime users choose: "local" (faster-whisper) or "cloud" (Voxclar Cloud ASR / Deepgram)
-        asrMode = lc.asr_mode === 'cloud' ? 'deepgram' : 'local'
-        aiModel = lc.ai_model || 'auto'
-        userApiKeys = {}
-        if (lc.claude_api_key) userApiKeys['CLAUDE_API_KEY'] = lc.claude_api_key
-        if (lc.openai_api_key) userApiKeys['OPENAI_API_KEY'] = lc.openai_api_key
-        if (lc.deepseek_api_key) userApiKeys['DEEPSEEK_API_KEY'] = lc.deepseek_api_key
-      }
-    } catch {}
+    let serverApiUrl = ''
+    let serverToken = ''
+
+    if (isLifetime) {
+      // Lifetime: local engine handles everything with user's own API keys
+      try {
+        const { loadLifetimeConfig } = await import('@/services/storage')
+        const lc = loadLifetimeConfig()
+        if (lc) {
+          asrMode = lc.asr_mode === 'cloud' ? 'deepgram' : 'local'
+          aiModel = lc.ai_model || 'auto'
+          userApiKeys = {}
+          if (lc.claude_api_key) userApiKeys['CLAUDE_API_KEY'] = lc.claude_api_key
+          if (lc.openai_api_key) userApiKeys['OPENAI_API_KEY'] = lc.openai_api_key
+          if (lc.deepseek_api_key) userApiKeys['DEEPSEEK_API_KEY'] = lc.deepseek_api_key
+        }
+      } catch {}
+    } else if (isSubscriber) {
+      // Subscribers: ASR and AI answers go through server
+      asrMode = 'server'
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
+      serverApiUrl = apiUrl
+      serverToken = localStorage.getItem('access_token') || ''
+    }
 
     sendMessage({
       type: 'start_meeting',
@@ -176,6 +192,8 @@ export function useEngine() {
       asr_mode: asrMode,
       user_api_keys: userApiKeys,
       ai_model: aiModel,
+      server_api_url: serverApiUrl,
+      server_token: serverToken,
     })
   }, [sendMessage])
 

@@ -7,7 +7,7 @@ class AnswerRequest(BaseModel):
     meeting_id: str | None = None
     meeting_type: str = "general"
     language: str = "en"
-    context: dict | None = None
+    context: str | dict | None = None
 
 
 class SummarizeRequest(BaseModel):

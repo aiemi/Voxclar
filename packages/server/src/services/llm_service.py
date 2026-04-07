@@ -62,13 +62,15 @@ async def generate_answer(
     question_type: str,
     meeting_type: str = "general",
     language: str = "en",
-    context: dict | None = None,
+    context: str | dict | None = None,
 ) -> AsyncGenerator[str, None]:
     settings = get_settings()
 
-    # Build context string
+    # Build context string — accept both string (from local engine proxy) and dict
     context_str = ""
-    if context:
+    if isinstance(context, str):
+        context_str = context
+    elif isinstance(context, dict):
         if context.get("resume"):
             context_str += f"\nUser Resume:\n{context['resume']}\n"
         if context.get("prep_notes"):

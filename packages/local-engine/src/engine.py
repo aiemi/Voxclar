@@ -72,16 +72,20 @@ class MeetingEngine:
                       meeting_title: str = "", memory_data: str = "",
                       asr_mode: str = "deepgram",
                       user_api_keys: dict | None = None,
-                      ai_model: str = "auto"):
+                      ai_model: str = "auto",
+                      server_api_url: str = "",
+                      server_token: str = ""):
         if self.is_running:
             logger.warning("Meeting already running")
             return
 
         self._meeting_start_time = time.time()
         self._meeting_title = meeting_title
-        self._asr_mode = asr_mode  # "deepgram" or "local"
+        self._asr_mode = asr_mode  # "deepgram", "local", or "server"
         self._user_api_keys = user_api_keys or {}
         self._ai_model = ai_model  # "auto", "claude", "openai", "deepseek"
+        self._server_api_url = server_api_url  # e.g. "https://voxclar.com/api/v1"
+        self._server_token = server_token  # JWT for server auth
 
         # Lifetime 用户：注入自定义 API keys 到环境变量
         if self._user_api_keys:
@@ -114,7 +118,7 @@ class MeetingEngine:
         # 智能问题检测（LLM）
         self._detector = SmartQuestionDetector(default_language=language)
 
-        # ASR — Deepgram (cloud) or faster-whisper (local)
+        # ASR — Deepgram (cloud), faster-whisper (local), or server proxy
         self._local_asr = None
         if self._asr_mode == "local":
             from src.asr.streaming import StreamingASR
@@ -122,6 +126,24 @@ class MeetingEngine:
             self._system_deepgram = None
             self._mic_deepgram = None
             logger.info("Using local ASR (faster-whisper)")
+        elif self._asr_mode == "server":
+            # Subscriber mode: use server's Deepgram proxy
+            # The server has the API key, we just relay audio
+            from src.asr.server_asr_stream import ServerASRStream
+            asr_ws_url = self._server_api_url.replace("http", "ws") + "/asr/stream"
+            self._system_deepgram = ServerASRStream(
+                ws_url=asr_ws_url,
+                token=self._server_token,
+                language=language,
+                on_transcript=self._on_system_transcript,
+            )
+            self._mic_deepgram = ServerASRStream(
+                ws_url=asr_ws_url,
+                token=self._server_token,
+                language=language,
+                on_transcript=self._on_mic_transcript,
+            )
+            logger.info("Using server ASR proxy (subscriber)")
         else:
             self._system_deepgram = DeepgramStream(
                 language=language,
@@ -131,7 +153,7 @@ class MeetingEngine:
                 language=language,
                 on_transcript=self._on_mic_transcript,
             )
-            logger.info("Using cloud ASR (Deepgram)")
+            logger.info("Using cloud ASR (Deepgram direct)")
 
         if self._loop:
             asyncio.run_coroutine_threadsafe(self._connect_and_start(), self._loop)
@@ -514,14 +536,49 @@ class MeetingEngine:
 
     async def _generate_answer(self, question: str, question_type: str):
         try:
-            async for token in generate_answer(
-                context=self._context,
-                question=question,
-                question_type=question_type,
-                preferred_model=getattr(self, '_ai_model', 'auto'),
-            ):
-                if self.on_answer_token:
-                    self.on_answer_token({"type": "answer", "token": token})
-                self._context.update_answer(token)
+            if self._asr_mode == "server" and self._server_api_url:
+                # Subscriber: use server LLM proxy
+                async for token in self._server_generate_answer(question, question_type):
+                    if self.on_answer_token:
+                        self.on_answer_token({"type": "answer", "token": token})
+                    self._context.update_answer(token)
+            else:
+                # Lifetime/direct: use local API keys
+                async for token in generate_answer(
+                    context=self._context,
+                    question=question,
+                    question_type=question_type,
+                    preferred_model=getattr(self, '_ai_model', 'auto'),
+                ):
+                    if self.on_answer_token:
+                        self.on_answer_token({"type": "answer", "token": token})
+                    self._context.update_answer(token)
         except Exception as e:
             logger.error(f"Answer generation error: {e}")
+
+    async def _server_generate_answer(self, question: str, question_type: str):
+        """Stream AI answer from server LLM proxy (for subscribers)."""
+        import httpx
+        url = f"{self._server_api_url}/llm/answer"
+        headers = {"Authorization": f"Bearer {self._server_token}"}
+
+        # Build context string from current meeting context
+        system_prompt, user_msg = self._context.build_prompt(question, question_type)
+        context_str = system_prompt + "\n\n" + user_msg
+
+        payload = {
+            "question": question,
+            "question_type": question_type,
+            "meeting_type": self._context.meeting_type,
+            "language": self._context.language,
+            "context": context_str,
+        }
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            async with client.stream("POST", url, json=payload, headers=headers) as resp:
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        token = line[6:]
+                        if token == "[DONE]":
+                            return
+                        yield token
