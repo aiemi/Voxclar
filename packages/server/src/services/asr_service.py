@@ -36,8 +36,9 @@ async def proxy_asr_stream(websocket: WebSocket, language: str = "en"):
         "channels=1",
     ]
 
+    # Note: detect_language requires Deepgram paid plan, fallback to "en"
     if language in ("multi", "auto", ""):
-        params.append("detect_language=true")
+        params.append("language=en")
     else:
         params.append(f"language={language}")
 
