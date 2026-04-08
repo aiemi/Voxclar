@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.dependencies import get_db, get_current_user_id
-from src.schemas.answer import AnswerRequest, SummarizeRequest, ExperienceSearchRequest
+from src.schemas.answer import AnswerRequest, SummarizeRequest, ExperienceSearchRequest, DetectQuestionRequest
 from src.services import llm_service
 from src.services.vector_service import search_experience
 from src.services.meeting_service import get_transcripts
@@ -47,6 +47,15 @@ async def summarize(
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.post("/detect")
+async def detect_question(
+    body: DetectQuestionRequest,
+    user_id: str = Depends(get_current_user_id),
+):
+    result = await llm_service.detect_question(body.text)
+    return result
 
 
 @router.post("/search-experience")

@@ -57,6 +57,55 @@ Rules:
 - Match the language of the question"""
 
 
+LLM_DETECT_PROMPT = """In a live interview, the other person just said this. Should the AI generate a suggested response for the user?
+
+yes = ANY of these:
+- Direct or indirect question
+- Request ("tell me", "walk me through", "describe")
+- Statement that implies the user should respond or elaborate
+- Substantial statement where the speaker has shared their view and is waiting for input
+- ANY speech longer than 2 sentences (in interviews, long statements almost always expect a reply)
+
+no = ONLY these:
+- Very short greeting ("hi", "nice to meet you")
+- Pure transition ("let's move on", "okay next question")
+- Less than 5 words with no substance
+
+When in doubt, say yes. It's better to generate an unnecessary suggestion than to miss a question.
+
+Reply EXACTLY: yes,behavioral OR yes,technical OR yes,general OR no,none"""
+
+
+async def detect_question(text: str) -> dict:
+    """Detect if text contains a question that needs answering."""
+    settings = get_settings()
+    try:
+        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        resp = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": LLM_DETECT_PROMPT},
+                {"role": "user", "content": text[:800]},
+            ],
+            max_tokens=5,
+            temperature=0,
+        )
+        answer = (resp.choices[0].message.content or "").strip().lower()
+        is_question = answer.startswith("yes")
+        q_type = "general"
+        if "technical" in answer:
+            q_type = "technical"
+        elif "behavioral" in answer:
+            q_type = "behavioral"
+        return {
+            "is_question": is_question,
+            "question_type": q_type,
+            "confidence": 0.9 if is_question else 0.1,
+        }
+    except Exception as e:
+        return {"is_question": False, "question_type": "general", "confidence": 0}
+
+
 async def generate_answer(
     question: str,
     question_type: str,
