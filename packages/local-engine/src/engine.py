@@ -1,7 +1,9 @@
-"""主引擎 — Deepgram 实时流式 + 上下文管理 + AI 回答。
+"""主引擎 — 音频采集 + ASR + 服务器 AI 回答。
 
-系统音频 → Deepgram 转写 → 问题检测 → AI 回答（带完整上下文）
-麦克风   → Deepgram 转写 → 存入上下文（用户自己说的话）
+统一架构：
+  - ASR: 本地 faster-whisper (Lifetime) 或 服务器 Deepgram 代理
+  - 问题检测 + AI 回答: 全部走服务器
+  - 上下文管理: 本地引擎维护
 """
 import asyncio
 import json
@@ -16,9 +18,6 @@ import numpy as np
 from src.audio.capture_manager import DualAudioCaptureManager
 from src.audio.noise_reducer import AdaptiveNoiseReducer
 from src.audio.echo_canceller import EchoCanceller
-from src.asr.deepgram_stream import DeepgramStream
-from src.ai.smart_detector import SmartQuestionDetector
-from src.ai.answer_generator import generate_answer
 from src.ai.meeting_context import MeetingContext
 from src.ai.user_memory import UserMemory, MeetingSummary, MEETING_SUMMARY_PROMPT, USER_INSIGHT_PROMPT
 
@@ -45,11 +44,10 @@ class MeetingEngine:
         self._capture: DualAudioCaptureManager | None = None
         self._noise_reducer: AdaptiveNoiseReducer | None = None
         self._echo_canceller: EchoCanceller | None = None
-        self._system_deepgram: DeepgramStream | None = None
-        self._mic_deepgram: DeepgramStream | None = None
+        self._system_asr = None  # ServerASRStream or None (local ASR uses _local_asr)
+        self._mic_asr = None
 
-        # AI
-        self._detector: SmartQuestionDetector | None = None
+        # AI (context only — detection + answering all go through server)
         self._context: MeetingContext = MeetingContext()
         self._memory: UserMemory = UserMemory()
 
@@ -70,7 +68,7 @@ class MeetingEngine:
                       audio_source: str = "system", prep_notes: str = "",
                       profile_context: str = "", prep_docs_summary: str = "",
                       meeting_title: str = "", memory_data: str = "",
-                      asr_mode: str = "deepgram",
+                      asr_mode: str = "server",
                       user_api_keys: dict | None = None,
                       ai_model: str = "auto",
                       server_api_url: str = "",
@@ -81,17 +79,9 @@ class MeetingEngine:
 
         self._meeting_start_time = time.time()
         self._meeting_title = meeting_title
-        self._asr_mode = asr_mode  # "deepgram", "local", or "server"
-        self._user_api_keys = user_api_keys or {}
-        self._ai_model = ai_model  # "auto", "claude", "openai", "deepseek"
-        self._server_api_url = server_api_url  # e.g. "https://voxclar.com/api/v1"
-        self._server_token = server_token  # JWT for server auth
-
-        # Lifetime 用户：注入自定义 API keys 到环境变量
-        if self._user_api_keys:
-            for key, value in self._user_api_keys.items():
-                if value:
-                    os.environ[key] = value
+        self._asr_mode = asr_mode  # "local" or "server"
+        self._server_api_url = server_api_url
+        self._server_token = server_token
 
         # 加载历史记忆
         if memory_data:
@@ -115,45 +105,33 @@ class MeetingEngine:
         self._noise_reducer = AdaptiveNoiseReducer()
         self._echo_canceller = EchoCanceller()
 
-        # 智能问题检测（LLM）
-        self._detector = SmartQuestionDetector(default_language=language)
-
-        # ASR — Deepgram (cloud), faster-whisper (local), or server proxy
+        # ASR — only "local" (faster-whisper) or "server" (Deepgram proxy)
         self._local_asr = None
         if self._asr_mode == "local":
             from src.asr.streaming import StreamingASR
             self._local_asr = StreamingASR(model_size="small", language=language)
-            self._system_deepgram = None
-            self._mic_deepgram = None
+            self._system_asr = None
+            self._mic_asr = None
             logger.info("Using local ASR (faster-whisper)")
-        elif self._asr_mode == "server":
-            # Subscriber mode: use server's Deepgram proxy
-            # The server has the API key, we just relay audio
+        else:
             from src.asr.server_asr_stream import ServerASRStream
             asr_ws_url = self._server_api_url.replace("http", "ws") + "/asr/stream"
-            self._system_deepgram = ServerASRStream(
+            logger.info(f"[ASR] server_api_url={self._server_api_url}")
+            logger.info(f"[ASR] asr_ws_url={asr_ws_url}")
+            logger.info(f"[ASR] token={'SET(' + str(len(self._server_token)) + ' chars)' if self._server_token else 'EMPTY!'}")
+            self._system_asr = ServerASRStream(
                 ws_url=asr_ws_url,
                 token=self._server_token,
                 language=language,
                 on_transcript=self._on_system_transcript,
             )
-            self._mic_deepgram = ServerASRStream(
+            self._mic_asr = ServerASRStream(
                 ws_url=asr_ws_url,
                 token=self._server_token,
                 language=language,
                 on_transcript=self._on_mic_transcript,
             )
-            logger.info("Using server ASR proxy (subscriber)")
-        else:
-            self._system_deepgram = DeepgramStream(
-                language=language,
-                on_transcript=self._on_system_transcript,
-            )
-            self._mic_deepgram = DeepgramStream(
-                language=language,
-                on_transcript=self._on_mic_transcript,
-            )
-            logger.info("Using cloud ASR (Deepgram direct)")
+            logger.info("Using server ASR proxy")
 
         if self._loop:
             asyncio.run_coroutine_threadsafe(self._connect_and_start(), self._loop)
@@ -183,22 +161,10 @@ class MeetingEngine:
             # Start local ASR polling loop
             asyncio.ensure_future(self._local_asr_poll_loop())
         else:
-            # Cloud ASR mode — connect to Deepgram
-            system_ok = await self._system_deepgram.connect()
-            if not system_ok:
-                if self.on_error:
-                    self.on_error({
-                        "type": "error",
-                        "message": "Deepgram connection failed. Check DEEPGRAM_API_KEY.",
-                        "fatal": True,
-                    })
-                return
-
-            mic_ok = await self._mic_deepgram.connect()
-            if not mic_ok:
-                logger.warning("Mic Deepgram connection failed (non-critical)")
-
-            self.is_running = True  # Set before starting capture so callbacks aren't dropped
+            # Cloud/Server ASR mode
+            # IMPORTANT: Start audio capture FIRST, then connect ASR
+            # Audio must be flowing before Deepgram connection or it times out
+            self.is_running = True
 
             self._capture = DualAudioCaptureManager()
             self._capture.on_system_audio = self._on_system_audio
@@ -212,11 +178,28 @@ class MeetingEngine:
                         "message": "System audio capture not available.",
                         "fatal": True,
                     })
+                self.is_running = False
+                return
 
             try:
                 self._capture.start_mic()
             except Exception as e:
                 logger.warning(f"Mic capture failed: {e}")
+
+            # Now connect ASR (audio is already flowing)
+            system_ok = await self._system_asr.connect()
+            if not system_ok:
+                logger.error("System ASR connection failed")
+                if self.on_error:
+                    self.on_error({
+                        "type": "error",
+                        "message": "ASR connection failed.",
+                        "fatal": False,
+                    })
+
+            mic_ok = await self._mic_asr.connect()
+            if not mic_ok:
+                logger.warning("Mic ASR connection failed (non-critical)")
 
         self.is_running = True
         asr_label = "local (faster-whisper)" if self._asr_mode == "local" else "deepgram"
@@ -233,17 +216,17 @@ class MeetingEngine:
         if self._capture:
             self._capture.stop()
         if self._loop:
-            if self._system_deepgram:
-                asyncio.run_coroutine_threadsafe(self._system_deepgram.disconnect(), self._loop)
-            if self._mic_deepgram:
-                asyncio.run_coroutine_threadsafe(self._mic_deepgram.disconnect(), self._loop)
+            if self._system_asr:
+                asyncio.run_coroutine_threadsafe(self._system_asr.disconnect(), self._loop)
+            if self._mic_asr:
+                asyncio.run_coroutine_threadsafe(self._mic_asr.disconnect(), self._loop)
             asyncio.run_coroutine_threadsafe(self._save_meeting_memory(), self._loop)
         self._recent_system_text = ""
         self._all_system_text = ""
         logger.info("Meeting stopped")
 
     async def _save_meeting_memory(self):
-        """会议结束后浓缩本次会议内容，更新用户记忆。"""
+        """会议结束后通过服务器生成摘要，更新用户记忆。"""
         try:
             qa_text = ""
             for qa in self._context.qa_history:
@@ -257,35 +240,34 @@ class MeetingEngine:
                 self._context.reset()
                 return
 
-            meeting_text = f"Meeting type: {self._context.meeting_type}\n\nQ&A:\n{qa_text}\n\nUser said:\n{user_said}"
-
-            import os
-            api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
-            if not api_key:
+            if not self._server_api_url:
                 self._context.reset()
                 return
 
-            from openai import AsyncOpenAI
-            use_deepseek = not os.environ.get("OPENAI_API_KEY")
-            client = AsyncOpenAI(
-                api_key=api_key,
-                base_url="https://api.deepseek.com" if use_deepseek else None,
-            )
-            model = "deepseek-chat" if use_deepseek else "gpt-4o-mini"
+            meeting_text = f"Meeting type: {self._context.meeting_type}\n\nQ&A:\n{qa_text}\n\nUser said:\n{user_said}"
 
-            resp = await client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": MEETING_SUMMARY_PROMPT},
-                    {"role": "user", "content": meeting_text[:4000]},
-                ],
-                max_tokens=400,
-                temperature=0,
-            )
-            content = resp.choices[0].message.content or ""
+            # Use server to generate memory summary
+            import httpx
+            headers = {"Authorization": f"Bearer {self._server_token}"}
+            summary_text = ""
+            async with httpx.AsyncClient(timeout=60) as client:
+                async with client.stream("POST", f"{self._server_api_url}/ai/answer",
+                    json={
+                        "question": meeting_text[:4000],
+                        "question_type": "general",
+                        "meeting_type": self._context.meeting_type,
+                        "language": self._context.language,
+                        "context": MEETING_SUMMARY_PROMPT,
+                    }, headers=headers) as resp:
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data: "):
+                            token = line[6:]
+                            if token == "[DONE]":
+                                break
+                            summary_text += token
 
             import re
-            match = re.search(r"\{[\s\S]*\}", content)
+            match = re.search(r"\{[\s\S]*\}", summary_text)
             if match:
                 data = json.loads(match.group())
                 from datetime import datetime
@@ -300,55 +282,46 @@ class MeetingEngine:
                 )
                 self._memory.add_meeting(summary)
 
-                history_text = "\n".join(
-                    f"- {ms.date}: {ms.summary} | Patterns: {ms.user_patterns}"
-                    for ms in self._memory.meeting_summaries[:10]
-                )
-                resp2 = await client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": USER_INSIGHT_PROMPT},
-                        {"role": "user", "content": f"Meeting history:\n{history_text}"},
-                    ],
-                    max_tokens=300,
-                    temperature=0,
-                )
-                self._memory.user_insights = resp2.choices[0].message.content or ""
-
                 if self.on_save_memory:
                     self.on_save_memory({
                         "type": "save_memory",
                         "memory": self._memory.to_dict(),
                     })
 
-                # 会议摘要
-                detailed = await self._generate_meeting_summary(client, model, meeting_text)
+                # 详细会议摘要
+                detailed = await self._generate_meeting_summary(meeting_text)
                 if detailed and self.on_save_memory:
                     self.on_save_memory({"type": "meeting_summary", "summary": detailed})
 
-                logger.info("Meeting memory saved and user insights updated")
+                logger.info("Meeting memory saved via server")
 
         except Exception as e:
             logger.error(f"Save meeting memory failed: {e}")
         finally:
             self._context.reset()
 
-    async def _generate_meeting_summary(self, client, model: str, meeting_text: str) -> str:
+    async def _generate_meeting_summary(self, meeting_text: str) -> str:
+        """通过服务器生成详细会议摘要。"""
         try:
-            resp = await client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": (
-                        "Generate a professional meeting summary. Include:\n"
-                        "## Key Discussion Points\n## Questions Asked & Responses\n"
-                        "## Decisions & Action Items\n## Performance Notes\n"
-                        "Use markdown. Match the meeting's language."
-                    )},
-                    {"role": "user", "content": meeting_text[:6000]},
-                ],
-                max_tokens=1000, temperature=0.2,
-            )
-            return resp.choices[0].message.content or ""
+            import httpx
+            headers = {"Authorization": f"Bearer {self._server_token}"}
+            result = ""
+            async with httpx.AsyncClient(timeout=60) as client:
+                async with client.stream("POST", f"{self._server_api_url}/ai/answer",
+                    json={
+                        "question": meeting_text[:6000],
+                        "question_type": "general",
+                        "meeting_type": self._context.meeting_type,
+                        "language": self._context.language,
+                        "context": "Generate a professional meeting summary. Include:\n## Key Discussion Points\n## Questions Asked & Responses\n## Decisions & Action Items\n## Performance Notes\nUse markdown. Match the meeting's language.",
+                    }, headers=headers) as resp:
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data: "):
+                            token = line[6:]
+                            if token == "[DONE]":
+                                break
+                            result += token
+            return result
         except Exception as e:
             logger.error(f"Meeting summary generation failed: {e}")
             return ""
@@ -362,24 +335,24 @@ class MeetingEngine:
     # ═══════════════════════════════════════════════════════════════════
 
     def _on_system_audio(self, audio: np.ndarray):
-        if not self.is_running or not self._system_deepgram:
+        if not self.is_running or not self._system_asr:
             return
         try:
             if self._noise_reducer and self._noise_reducer.enabled:
                 audio = self._noise_reducer.process(audio)
-            self._system_deepgram.send_audio(audio)
+            self._system_asr.send_audio(audio)
             if self._echo_canceller:
                 self._echo_canceller.feed_reference(audio)
         except Exception as e:
             logger.error(f"System audio error: {e}")
 
     def _on_mic_audio(self, audio: np.ndarray):
-        if not self.is_running or not self._mic_deepgram:
+        if not self.is_running or not self._mic_asr:
             return
         try:
             if self._echo_canceller:
                 audio = self._echo_canceller.cancel(audio)
-            self._mic_deepgram.send_audio(audio)
+            self._mic_asr.send_audio(audio)
         except Exception as e:
             logger.error(f"Mic audio error: {e}")
 
@@ -430,11 +403,14 @@ class MeetingEngine:
         is_final = result.get("is_final", False)
         timestamp_ms = int((time.time() - self._meeting_start_time) * 1000)
 
+        logger.info(f"[PIPELINE] _on_system_transcript called: text='{text[:60]}' final={is_final}")
+
         # speaker_id: Deepgram diarization (0, 1, 2...)
         speaker_id = result.get("speaker_id")
         speaker_label = f"Speaker {speaker_id}" if speaker_id is not None else "other"
 
         if self.on_transcription:
+            logger.info(f"[PIPELINE] calling on_transcription callback...")
             self.on_transcription({
                 "type": "transcription",
                 "text": text,
@@ -445,6 +421,9 @@ class MeetingEngine:
                 "speaker_id": speaker_id,
                 "speaker_label": speaker_label,
             })
+            logger.info(f"[PIPELINE] on_transcription callback DONE")
+        else:
+            logger.warning(f"[PIPELINE] on_transcription is None! transcript lost!")
 
         # 问题检测 — 和初版一样的累积逻辑，只是检测方式换成 LLM
         if is_final and self._detector:
@@ -471,9 +450,9 @@ class MeetingEngine:
                 )
 
     async def _detect_and_respond(self, text: str):
-        """LLM 判断是否是问题，是的话立即生成回答。"""
+        """服务器 LLM 判断是否是问题，是的话立即生成回答。"""
         try:
-            result = await self._detector.detect_with_llm(text)
+            result = await self._server_detect_question(text)
         finally:
             self._detecting = False
 
@@ -537,31 +516,38 @@ class MeetingEngine:
     # ═══════════════════════════════════════════════════════════════════
 
     async def _generate_answer(self, question: str, question_type: str):
+        """通过服务器生成 AI 回答（所有用户统一走服务器）。"""
         try:
-            if self._asr_mode == "server" and self._server_api_url:
-                # Subscriber: use server LLM proxy
-                async for token in self._server_generate_answer(question, question_type):
-                    if self.on_answer_token:
-                        self.on_answer_token({"type": "answer", "token": token})
-                    self._context.update_answer(token)
-            else:
-                # Lifetime/direct: use local API keys
-                async for token in generate_answer(
-                    context=self._context,
-                    question=question,
-                    question_type=question_type,
-                    preferred_model=getattr(self, '_ai_model', 'auto'),
-                ):
-                    if self.on_answer_token:
-                        self.on_answer_token({"type": "answer", "token": token})
-                    self._context.update_answer(token)
+            async for token in self._server_generate_answer(question, question_type):
+                if self.on_answer_token:
+                    self.on_answer_token({"type": "answer", "token": token})
+                self._context.update_answer(token)
+                await asyncio.sleep(0)  # yield to event loop so each token sends individually
         except Exception as e:
             logger.error(f"Answer generation error: {e}")
+
+    async def _server_detect_question(self, text: str) -> dict:
+        """Detect question via server LLM proxy (for subscribers without local API keys)."""
+        import httpx
+        url = f"{self._server_api_url}/ai/detect"
+        headers = {"Authorization": f"Bearer {self._server_token}"}
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(url, json={"text": text}, headers=headers)
+                if resp.status_code == 200:
+                    result = resp.json()
+                    logger.info(f"[Detect] Server: is_question={result.get('is_question')}, type={result.get('question_type')}")
+                    return result
+                else:
+                    logger.error(f"[Detect] Server returned {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            logger.error(f"[Detect] Server detection failed: {e}")
+        return {"is_question": False, "question_type": "general", "confidence": 0}
 
     async def _server_generate_answer(self, question: str, question_type: str):
         """Stream AI answer from server LLM proxy (for subscribers)."""
         import httpx
-        url = f"{self._server_api_url}/llm/answer"
+        url = f"{self._server_api_url}/ai/answer"
         headers = {"Authorization": f"Bearer {self._server_token}"}
 
         # Build context string from current meeting context

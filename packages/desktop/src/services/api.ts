@@ -128,6 +128,24 @@ export const api = {
   generateApiKey: () =>
     request<{ api_key: string }>('/payments/api-key/generate', { method: 'POST' }),
 
+  // Lifetime API Keys (stored encrypted on server)
+  getApiKeys: () => request<{ claude_key: string | null; openai_key: string | null; deepseek_key: string | null; preferred_model: string }>('/users/me/api-keys'),
+
+  saveApiKeys: (keys: { claude_key?: string | null; openai_key?: string | null; deepseek_key?: string | null; preferred_model?: string }) =>
+    request<{ claude_key: string | null; openai_key: string | null; deepseek_key: string | null; preferred_model: string }>('/users/me/api-keys', {
+      method: 'PUT',
+      body: JSON.stringify(keys),
+    }),
+
+  // Profile
+  getProfile: () => request<{ id: string; full_name: string | null; headline: string | null; summary: string | null; skills: string[]; education: unknown[]; experience: unknown[]; projects: unknown[] }>('/profiles/me'),
+
+  updateProfile: (data: { full_name?: string; headline?: string; summary?: string; skills?: string[] }) =>
+    request<unknown>('/profiles/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
   // Referrals
   getInviteCode: () => request<{ invite_code: string }>('/referrals/my-code'),
 

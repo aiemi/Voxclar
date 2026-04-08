@@ -9,7 +9,7 @@
     "build:web": "vite build",
     "build": "npm run build:electron && npm run build:web && electron-builder",
     "preview": "vite preview",
-    "electron:dev": "npm run build:electron && concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "electron:dev": "npm run build:electron && concurrently \"vite\" \"wait-on http://localhost:5173 && npx cross-env NODE_ENV=development electron .\"",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -88,13 +88,6 @@
       "target": [
         "AppImage"
       ]
-    },
-    "extraResources": [
-      {
-        "from": "../local-engine/dist/voxclar-engine",
-        "to": "engine",
-        "filter": ["**/*"]
-      }
-    ]
+    }
   }
 }

@@ -5,7 +5,7 @@ import path from 'path'
 export default defineConfig({
   base: './',
   build: {
-    outDir: 'dist-renderer',
+    outDir: 'app-dist',
   },
   plugins: [react()],
   resolve: {

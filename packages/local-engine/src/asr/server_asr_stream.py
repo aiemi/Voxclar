@@ -30,6 +30,7 @@ class ServerASRStream:
         self._queue: asyncio.Queue | None = None
         self._send_task = None
         self._recv_task = None
+        self._loop: asyncio.AbstractEventLoop | None = None
 
     async def connect(self) -> bool:
         """Connect to server ASR proxy WebSocket."""
@@ -38,6 +39,7 @@ class ServerASRStream:
             url = f"{self.ws_url}?token={self.token}&language={self.language}"
             self._ws = await websockets.connect(url, ping_interval=20, ping_timeout=10)
             self._connected = True
+            self._loop = asyncio.get_running_loop()
             self._queue = asyncio.Queue(maxsize=500)
 
             self._send_task = asyncio.create_task(self._send_loop())
@@ -52,15 +54,15 @@ class ServerASRStream:
             return False
 
     def send_audio(self, audio: np.ndarray):
-        """Send audio chunk to server (called from audio capture thread)."""
-        if not self._connected or not self._queue:
+        """Send audio chunk to server (called from audio capture thread — thread-safe)."""
+        if not self._connected or not self._queue or not self._loop:
             return
         # Convert float32 to int16 bytes
         int16_data = (audio * 32767).astype(np.int16).tobytes()
         try:
-            self._queue.put_nowait(int16_data)
-        except asyncio.QueueFull:
-            pass  # Drop frames if queue is full
+            self._loop.call_soon_threadsafe(self._queue.put_nowait, int16_data)
+        except (asyncio.QueueFull, RuntimeError):
+            pass
 
     async def _send_loop(self):
         """Continuously send queued audio to server."""
@@ -74,26 +76,38 @@ class ServerASRStream:
 
     async def _receive_loop(self):
         """Receive transcription results from server."""
+        logger.info("_receive_loop STARTED, waiting for messages...")
+        msg_count = 0
         try:
             async for message in self._ws:
                 import json
+                msg_count += 1
+                logger.info(f"_receive_loop got message #{msg_count}: {str(message)[:200]}")
                 try:
                     data = json.loads(message)
-                    if data.get("type") == "transcript" and self.on_transcript:
+                    msg_type = data.get("type", "unknown")
+                    logger.info(f"_receive_loop parsed type={msg_type}")
+                    if msg_type == "transcript" and self.on_transcript:
+                        text = data.get("text", "")
+                        is_final = data.get("is_final", False)
+                        logger.info(f">>> TRANSCRIPT from server: '{text}' final={is_final}")
                         self.on_transcript({
-                            "text": data.get("text", ""),
-                            "is_final": data.get("is_final", False),
+                            "text": text,
+                            "is_final": is_final,
                             "language": data.get("language", self.language),
                             "confidence": data.get("confidence", 0.9),
                             "speaker_id": data.get("speaker_id"),
                         })
-                except json.JSONDecodeError:
-                    pass
-        except websockets.ConnectionClosed:
-            logger.info("Server ASR connection closed")
+                        logger.info(f">>> on_transcript callback DONE")
+                    elif msg_type == "error":
+                        logger.error(f"Server ASR error: {data.get('message', '')}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"_receive_loop JSON decode error: {e}, raw={str(message)[:100]}")
+        except websockets.ConnectionClosed as e:
+            logger.info(f"Server ASR connection closed: {e}")
         except Exception as e:
-            if self._connected:
-                logger.error(f"Server ASR receive error: {e}")
+            logger.error(f"Server ASR receive error: {e}", exc_info=True)
+        logger.info(f"_receive_loop ENDED after {msg_count} messages")
 
     async def disconnect(self):
         """Disconnect from server ASR proxy."""

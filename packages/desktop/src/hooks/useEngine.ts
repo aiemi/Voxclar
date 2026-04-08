@@ -145,35 +145,27 @@ export function useEngine() {
       memoryData = loadMemory()
     } catch {}
 
-    // Determine ASR mode and AI routing based on subscription tier
+    // Determine ASR mode based on subscription tier
     const { useAuthStore } = await import('@/stores/authStore')
     const user = useAuthStore.getState().user
     const isLifetime = user?.subscription_tier === 'lifetime'
-    // Free + Standard + Pro all use server mode (isSubscriber check removed)
 
-    let asrMode = 'server'  // Default: go through server (works for free + subscribers)
-    let userApiKeys: Record<string, string> | undefined
-    let aiModel = 'auto'
+    // All users go through server for AI. Only ASR differs.
+    let asrMode = 'server'  // Default: server Deepgram proxy
     // @ts-ignore
-    let serverApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
-    let serverToken = localStorage.getItem('access_token') || ''
+    const serverApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
+    const serverToken = localStorage.getItem('access_token') || ''
 
     if (isLifetime) {
-      // Lifetime: local engine handles everything with user's own API keys
+      // Lifetime can choose local ASR (faster-whisper) to save minutes
       try {
         const { loadLifetimeConfig } = await import('@/services/storage')
         const lc = loadLifetimeConfig()
-        if (lc) {
-          asrMode = lc.asr_mode === 'cloud' ? 'deepgram' : 'local'
-          aiModel = lc.ai_model || 'auto'
-          userApiKeys = {}
-          if (lc.claude_api_key) userApiKeys['CLAUDE_API_KEY'] = lc.claude_api_key
-          if (lc.openai_api_key) userApiKeys['OPENAI_API_KEY'] = lc.openai_api_key
-          if (lc.deepseek_api_key) userApiKeys['DEEPSEEK_API_KEY'] = lc.deepseek_api_key
+        if (lc?.asr_mode === 'local') {
+          asrMode = 'local'
         }
       } catch {}
     }
-    // Free + Standard + Pro: all go through server (server has API keys)
 
     sendMessage({
       type: 'start_meeting',
@@ -186,8 +178,6 @@ export function useEngine() {
       prep_docs_summary: config.prep_notes,
       memory_data: memoryData,
       asr_mode: asrMode,
-      user_api_keys: userApiKeys,
-      ai_model: aiModel,
       server_api_url: serverApiUrl,
       server_token: serverToken,
     })

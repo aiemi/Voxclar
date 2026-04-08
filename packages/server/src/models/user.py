@@ -31,6 +31,12 @@ class User(Base, UUIDMixin, TimestampMixin):
     asr_balance: Mapped[int] = mapped_column(Integer, default=0)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     api_key: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    # Lifetime user API keys (encrypted)
+    encrypted_claude_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    encrypted_openai_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    encrypted_deepseek_key: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    preferred_ai_model: Mapped[str] = mapped_column(String(20), default="auto")
+
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 

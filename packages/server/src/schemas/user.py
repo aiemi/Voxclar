@@ -26,6 +26,20 @@ class UserUpdate(BaseModel):
     avatar_url: str | None = None
 
 
+class ApiKeysUpdate(BaseModel):
+    claude_key: str | None = None
+    openai_key: str | None = None
+    deepseek_key: str | None = None
+    preferred_model: str = "auto"
+
+
+class ApiKeysResponse(BaseModel):
+    claude_key: str | None = None  # masked, last 4 chars
+    openai_key: str | None = None
+    deepseek_key: str | None = None
+    preferred_model: str = "auto"
+
+
 class UserStats(BaseModel):
     total_meetings: int
     total_duration_minutes: int

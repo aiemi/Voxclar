@@ -76,11 +76,12 @@ When in doubt, say yes. It's better to generate an unnecessary suggestion than t
 Reply EXACTLY: yes,behavioral OR yes,technical OR yes,general OR no,none"""
 
 
-async def detect_question(text: str) -> dict:
+async def detect_question(text: str, user_api_keys: dict | None = None) -> dict:
     """Detect if text contains a question that needs answering."""
     settings = get_settings()
+    api_key = (user_api_keys or {}).get("openai") or settings.OPENAI_API_KEY
     try:
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        client = AsyncOpenAI(api_key=api_key)
         resp = await client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -112,8 +113,10 @@ async def generate_answer(
     meeting_type: str = "general",
     language: str = "en",
     context: str | dict | None = None,
+    user_api_keys: dict | None = None,
 ) -> AsyncGenerator[str, None]:
     settings = get_settings()
+    keys = user_api_keys or {}
 
     # Build context string — accept both string (from local engine proxy) and dict
     context_str = ""
@@ -127,28 +130,31 @@ async def generate_answer(
         if context.get("conversation_history"):
             context_str += f"\nRecent Conversation:\n{context['conversation_history']}\n"
 
+    claude_key = keys.get("claude") or settings.CLAUDE_API_KEY
+    openai_key = keys.get("openai") or settings.OPENAI_API_KEY
+
     if question_type == "behavioral":
         async for token in _call_claude(
-            question, BEHAVIORAL_SYSTEM, context_str, settings
+            question, BEHAVIORAL_SYSTEM, context_str, claude_key
         ):
             yield token
     elif question_type == "technical":
         async for token in _call_claude(
-            question, TECHNICAL_SYSTEM, context_str, settings
+            question, TECHNICAL_SYSTEM, context_str, claude_key
         ):
             yield token
     else:
         system = SYSTEM_PROMPTS.get(meeting_type, SYSTEM_PROMPTS["general"])
         async for token in _call_openai(
-            question, system, context_str, settings
+            question, system, context_str, openai_key
         ):
             yield token
 
 
 async def _call_claude(
-    question: str, system: str, context: str, settings
+    question: str, system: str, context: str, api_key: str
 ) -> AsyncGenerator[str, None]:
-    client = AsyncAnthropic(api_key=settings.CLAUDE_API_KEY)
+    client = AsyncAnthropic(api_key=api_key)
     messages = [{"role": "user", "content": f"{context}\n\nQuestion: {question}"}]
 
     async with client.messages.stream(
@@ -162,9 +168,9 @@ async def _call_claude(
 
 
 async def _call_openai(
-    question: str, system: str, context: str, settings
+    question: str, system: str, context: str, api_key: str
 ) -> AsyncGenerator[str, None]:
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = AsyncOpenAI(api_key=api_key)
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": f"{context}\n\nQuestion: {question}"},

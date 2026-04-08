@@ -39,9 +39,13 @@ async def handle_client(websocket):
     def make_sender(ws):
         def send(data):
             try:
-                loop.call_soon_threadsafe(asyncio.ensure_future, ws.send(json.dumps(data)))
-            except Exception:
-                pass
+                msg_type = data.get("type", "unknown") if isinstance(data, dict) else "?"
+                logger.info(f"[SENDER] sending to Electron: type={msg_type} data={str(data)[:120]}")
+                json_str = json.dumps(data)
+                loop.call_soon_threadsafe(asyncio.ensure_future, ws.send(json_str))
+                logger.info(f"[SENDER] scheduled send OK ({len(json_str)} bytes)")
+            except Exception as e:
+                logger.error(f"[SENDER] FAILED to send: {e}")
         return send
 
     sender = make_sender(websocket)
@@ -289,8 +293,17 @@ async def extract_and_send_profile(websocket, resume_text: str):
 
 
 async def main():
-    logging.basicConfig(level=logging.INFO)
-    logger.info("Starting IMEET.AI Local Engine on ws://localhost:9876")
+    # Log to both console and file so we can debug Finder launches
+    log_path = os.path.join(os.path.expanduser("~"), "voxclar-engine.log")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_path, mode="w"),
+        ],
+    )
+    logger.info(f"Starting IMEET.AI Local Engine on ws://localhost:9876 (log: {log_path})")
 
     async with websockets.serve(handle_client, "localhost", 9876):
         await asyncio.Future()  # run forever
