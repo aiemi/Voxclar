@@ -18,11 +18,15 @@ class ServerASRStream:
     """WebSocket client that streams audio to the server's ASR proxy."""
 
     def __init__(self, ws_url: str, token: str, language: str = "en",
-                 on_transcript: Callable | None = None, sample_rate: int = 16000):
+                 on_transcript: Callable | None = None, sample_rate: int = 16000,
+                 on_question_detected: Callable | None = None,
+                 on_answer_token: Callable | None = None):
         self.ws_url = ws_url
         self.token = token
         self.language = language
         self.on_transcript = on_transcript
+        self.on_question_detected = on_question_detected
+        self.on_answer_token = on_answer_token
         self.sample_rate = sample_rate
 
         self._ws = None
@@ -90,7 +94,6 @@ class ServerASRStream:
                     if msg_type == "transcript" and self.on_transcript:
                         text = data.get("text", "")
                         is_final = data.get("is_final", False)
-                        logger.info(f">>> TRANSCRIPT from server: '{text}' final={is_final}")
                         self.on_transcript({
                             "text": text,
                             "is_final": is_final,
@@ -98,7 +101,11 @@ class ServerASRStream:
                             "confidence": data.get("confidence", 0.9),
                             "speaker_id": data.get("speaker_id"),
                         })
-                        logger.info(f">>> on_transcript callback DONE")
+                    elif msg_type == "question_detected" and self.on_question_detected:
+                        logger.info(f">>> QUESTION detected by server: {data.get('question', '')[:60]}")
+                        self.on_question_detected(data)
+                    elif msg_type == "answer" and self.on_answer_token:
+                        self.on_answer_token(data)
                     elif msg_type == "error":
                         logger.error(f"Server ASR error: {data.get('message', '')}")
                 except json.JSONDecodeError as e:
