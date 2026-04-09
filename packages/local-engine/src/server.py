@@ -62,13 +62,29 @@ async def handle_client(websocket):
         "details": {"platform": ENGINE.platform},
     }))
 
+    # Engine needs server URL for profile extraction etc. (set on first message)
+    def _ensure_server_config(msg):
+        """Extract server config from any message that contains it."""
+        url = msg.get("server_api_url", "")
+        token = msg.get("server_token", "")
+        if url and not ENGINE._server_api_url:
+            ENGINE._server_api_url = url
+            ENGINE._server_token = token
+
     try:
         async for message in websocket:
             try:
                 msg = json.loads(message)
                 msg_type = msg.get("type")
 
-                if msg_type == "start_meeting":
+                if msg_type == "set_config":
+                    # Frontend sends server URL + token on connect
+                    ENGINE._server_api_url = msg.get("server_api_url", "")
+                    ENGINE._server_token = msg.get("server_token", "")
+                    logger.info(f"Server config set: url={ENGINE._server_api_url}")
+
+                elif msg_type == "start_meeting":
+                    _ensure_server_config(msg)
                     ENGINE.start_meeting(
                         meeting_type=msg.get("meeting_type", "general"),
                         language=msg.get("language", "en"),

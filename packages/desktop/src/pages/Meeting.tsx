@@ -83,6 +83,29 @@ export default function Meeting() {
         })
         ws.close()
         setPrepFiles((prev) => [...prev, { name: file.name, summary }])
+
+        // Auto-fill prep notes with condensed summary
+        setPrepNotes((prev) => prev ? `${prev}\n\n[${file.name}]\n${summary}` : `[${file.name}]\n${summary}`)
+
+        // Auto-fill meeting topic from filename if empty
+        if (!title) {
+          const topicFromFile = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ')
+          setTitle(topicFromFile)
+        }
+
+        // Save condensed prep summary to server DB
+        try {
+          // @ts-ignore
+          const serverApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
+          fetch(`${serverApiUrl}/ai/context`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
+            },
+            body: JSON.stringify({ prep_docs_summary: summary }),
+          }).catch(() => {})
+        } catch {}
       } catch {
         setPrepFiles((prev) => [...prev, { name: file.name, summary: '(failed)' }])
       }
@@ -102,16 +125,28 @@ export default function Meeting() {
     const user = useAuthStore.getState().user
     const isLifetime = user?.subscription_tier === 'lifetime'
 
+    // Lifetime users: must have OpenAI API key on server
     if (isLifetime) {
       try {
-        const { loadLifetimeConfig } = await import('@/services/storage')
-        const lc = loadLifetimeConfig() || {}
-        if (!lc.claude_api_key && !lc.openai_api_key && !lc.deepseek_api_key) {
-          alert(t('meeting.no_api_key'))
+        const keys = await api.getApiKeys()
+        if (!keys.openai_key) {
+          alert(t('meeting.no_api_key') || 'Please add your OpenAI API key in Settings first.')
           navigate('/settings')
           return
         }
-      } catch {}
+      } catch {
+        alert('Cannot verify API keys. Please check your connection.')
+        return
+      }
+      // If using cloud ASR, check balance
+      const { loadLifetimeConfig } = await import('@/services/storage')
+      const lc = loadLifetimeConfig()
+      if (!lc?.asr_mode || lc.asr_mode !== 'local') {
+        if ((user?.asr_balance || 0) <= 0) {
+          alert(t('meeting.insufficient_minutes') || 'Insufficient Cloud ASR minutes. Please top up or switch to Local ASR in Settings.')
+          return
+        }
+      }
     }
 
     if (!isLifetime) {

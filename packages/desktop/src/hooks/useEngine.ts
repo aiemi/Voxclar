@@ -27,6 +27,15 @@ export function useEngine() {
     socket.onopen = () => {
       reconnectAttempt.current = 0
       updateStatus('ready')
+      // Send server config immediately so engine can use it for profile extraction etc.
+      // @ts-ignore
+      const serverApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
+      const serverToken = localStorage.getItem('access_token') || ''
+      socket.send(JSON.stringify({
+        type: 'set_config',
+        server_api_url: serverApiUrl,
+        server_token: serverToken,
+      }))
     }
 
     socket.onmessage = (event) => {

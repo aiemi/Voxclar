@@ -152,8 +152,20 @@ export default function Settings() {
     setSaved(false)
   }
 
-  const handleSaveKeys = () => {
+  const handleSaveKeys = async () => {
     saveLifetimeConfig(ltConfig)
+    // Also save API keys to server (encrypted)
+    try {
+      const { api: apiSvc } = await import('@/services/api')
+      await apiSvc.saveApiKeys({
+        openai_key: ltConfig.openai_api_key || null,
+        claude_key: ltConfig.claude_api_key || null,
+        deepseek_key: ltConfig.deepseek_api_key || null,
+        preferred_model: ltConfig.ai_model || 'auto',
+      })
+    } catch (e) {
+      console.warn('Failed to save API keys to server:', e)
+    }
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
