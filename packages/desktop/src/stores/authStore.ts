@@ -1,43 +1,37 @@
 import { create } from 'zustand'
-import type { User } from '@/types'
 
-interface AuthState {
-  user: User | null
-  accessToken: string | null
-  refreshToken: string | null
-  isAuthenticated: boolean
-  login: (user: User, accessToken: string, refreshToken: string) => void
-  logout: () => void
-  updateUser: (updates: Partial<User>) => void
-  setTokens: (accessToken: string, refreshToken: string) => void
+interface LicenseState {
+  license_key: string | null
+  device_id: string | null
+  is_activated: boolean
+  activate: (licenseKey: string, deviceId: string) => void
+  deactivate: () => void
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  accessToken: localStorage.getItem('access_token'),
-  refreshToken: localStorage.getItem('refresh_token'),
-  isAuthenticated: !!localStorage.getItem('access_token'),
+function getOrCreateDeviceId(): string {
+  let id = localStorage.getItem('voxclar_device_id')
+  if (!id) {
+    id = crypto.randomUUID()
+    localStorage.setItem('voxclar_device_id', id)
+  }
+  return id
+}
 
-  login: (user, accessToken, refreshToken) => {
-    localStorage.setItem('access_token', accessToken)
-    localStorage.setItem('refresh_token', refreshToken)
-    set({ user, accessToken, refreshToken, isAuthenticated: true })
+export const useAuthStore = create<LicenseState>((set) => ({
+  license_key: localStorage.getItem('voxclar_license_key'),
+  device_id: getOrCreateDeviceId(),
+  is_activated: localStorage.getItem('voxclar_license_activated') === 'true',
+
+  activate: (licenseKey, deviceId) => {
+    localStorage.setItem('voxclar_license_key', licenseKey)
+    localStorage.setItem('voxclar_device_id', deviceId)
+    localStorage.setItem('voxclar_license_activated', 'true')
+    set({ license_key: licenseKey, device_id: deviceId, is_activated: true })
   },
 
-  logout: () => {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
-    set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false })
-  },
-
-  updateUser: (updates) =>
-    set((state) => ({
-      user: state.user ? { ...state.user, ...updates } : null,
-    })),
-
-  setTokens: (accessToken, refreshToken) => {
-    localStorage.setItem('access_token', accessToken)
-    localStorage.setItem('refresh_token', refreshToken)
-    set({ accessToken, refreshToken })
+  deactivate: () => {
+    localStorage.removeItem('voxclar_license_key')
+    localStorage.removeItem('voxclar_license_activated')
+    set({ license_key: null, is_activated: false })
   },
 }))

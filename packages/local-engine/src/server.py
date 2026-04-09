@@ -1,4 +1,7 @@
-"""WebSocket server for communication with Electron desktop app."""
+"""WebSocket server for communication with Electron desktop app.
+
+Lifetime version: all AI runs locally. No server dependency.
+"""
 import asyncio
 import json
 import logging
@@ -7,7 +10,7 @@ from pathlib import Path
 
 import websockets
 
-# 加载 .env（从项目根目录）
+# Load .env from project root
 _env_path = Path(__file__).resolve().parents[3] / ".env"
 if _env_path.exists():
     with open(_env_path) as f:
@@ -34,8 +37,6 @@ async def handle_client(websocket):
     loop = asyncio.get_running_loop()
     ENGINE._loop = loop
 
-    # 注册回调 — Deepgram 回调已在 asyncio 线程，但音频回调在其他线程
-    # 统一用 thread-safe 方式
     def make_sender(ws):
         def send(data):
             try:
@@ -62,29 +63,13 @@ async def handle_client(websocket):
         "details": {"platform": ENGINE.platform},
     }))
 
-    # Engine needs server URL for profile extraction etc. (set on first message)
-    def _ensure_server_config(msg):
-        """Extract server config from any message that contains it."""
-        url = msg.get("server_api_url", "")
-        token = msg.get("server_token", "")
-        if url and not ENGINE._server_api_url:
-            ENGINE._server_api_url = url
-            ENGINE._server_token = token
-
     try:
         async for message in websocket:
             try:
                 msg = json.loads(message)
                 msg_type = msg.get("type")
 
-                if msg_type == "set_config":
-                    # Frontend sends server URL + token on connect
-                    ENGINE._server_api_url = msg.get("server_api_url", "")
-                    ENGINE._server_token = msg.get("server_token", "")
-                    logger.info(f"Server config set: url={ENGINE._server_api_url}")
-
-                elif msg_type == "start_meeting":
-                    _ensure_server_config(msg)
+                if msg_type == "start_meeting":
                     ENGINE.start_meeting(
                         meeting_type=msg.get("meeting_type", "general"),
                         language=msg.get("language", "en"),
@@ -94,11 +79,9 @@ async def handle_client(websocket):
                         prep_docs_summary=msg.get("prep_docs_summary", ""),
                         meeting_title=msg.get("meeting_title", ""),
                         memory_data=msg.get("memory_data", ""),
-                        asr_mode=msg.get("asr_mode", "deepgram"),
+                        asr_mode=msg.get("asr_mode", "local"),
                         user_api_keys=msg.get("user_api_keys"),
                         ai_model=msg.get("ai_model", "auto"),
-                        server_api_url=msg.get("server_api_url", ""),
-                        server_token=msg.get("server_token", ""),
                     )
                     await websocket.send(json.dumps({
                         "type": "engine_status",
@@ -113,7 +96,6 @@ async def handle_client(websocket):
                     }))
 
                 elif msg_type == "parse_file":
-                    # 只解析文件 → 返回纯文本，不调 AI
                     file_data = msg.get("file_data", "")
                     filename = msg.get("filename", "file.txt")
                     if file_data:
@@ -127,7 +109,6 @@ async def handle_client(websocket):
                         }))
 
                 elif msg_type == "extract_profile":
-                    # 支持 base64 文件或纯文本
                     file_data = msg.get("file_data", "")
                     filename = msg.get("filename", "resume.txt")
                     resume_text = msg.get("resume_text", "")
@@ -175,35 +156,11 @@ async def handle_client(websocket):
 
 
 async def summarize_and_send(websocket, text: str, doc_type: str, doc_id: str):
-    """通过服务器 AI 浓缩文档。"""
+    """Summarize document using local OpenAI API calls."""
     try:
-        import httpx
-        server_url = ENGINE._server_api_url if ENGINE else ""
-        server_token = ENGINE._server_token if ENGINE else ""
-        logger.info(f"Summarizing document: {doc_id} ({len(text)} chars)")
-
-        if not server_url:
-            raise ValueError("No server URL")
-
-        headers = {"Authorization": f"Bearer {server_token}"}
-        summary = ""
-        async with httpx.AsyncClient(timeout=60) as client:
-            async with client.stream("POST", f"{server_url}/ai/answer",
-                json={
-                    "question": text[:6000],
-                    "question_type": "general",
-                    "meeting_type": "general",
-                    "language": "en",
-                    "context": f"Summarize this {doc_type} document concisely. Keep key information.",
-                }, headers=headers) as resp:
-                async for line in resp.aiter_lines():
-                    if line.startswith("data: "):
-                        token = line[6:]
-                        if token == "[DONE]":
-                            break
-                        summary += token
-
-        logger.info(f"Document summarized: {doc_id} → {len(summary)} chars")
+        from src.ai.document_summarizer import summarize_document
+        summary = await summarize_document(text, doc_type)
+        logger.info(f"Document summarized: {doc_id} -> {len(summary)} chars")
         await websocket.send(json.dumps({
             "type": "document_summarized",
             "doc_id": doc_id,
@@ -219,7 +176,7 @@ async def summarize_and_send(websocket, text: str, doc_type: str, doc_id: str):
 
 
 def parse_file_content(file_bytes: bytes, filename: str) -> str:
-    """从文件二进制中提取文本。支持 PDF、DOCX、TXT。"""
+    """Extract text from binary file. Supports PDF, DOCX, TXT."""
     name_lower = filename.lower()
     try:
         if name_lower.endswith('.pdf'):
@@ -234,7 +191,6 @@ def parse_file_content(file_bytes: bytes, filename: str) -> str:
             return "\n\n".join(pages)
 
         elif name_lower.endswith(('.docx', '.doc')):
-            # docx 是 zip 格式，提取 XML 中的文本
             import io
             import zipfile
             import re
@@ -261,7 +217,6 @@ def parse_file_content(file_bytes: bytes, filename: str) -> str:
             return "\n\n".join(texts)
 
         else:
-            # TXT 等纯文本
             return file_bytes.decode('utf-8', errors='ignore')
 
     except Exception as e:
@@ -270,13 +225,10 @@ def parse_file_content(file_bytes: bytes, filename: str) -> str:
 
 
 async def extract_and_send_profile(websocket, resume_text: str):
-    """通过服务器 AI 从简历提取结构化信息。"""
+    """Extract structured profile from resume using local OpenAI API."""
     try:
-        import httpx
-        server_url = ENGINE._server_api_url if ENGINE else ""
-        server_token = ENGINE._server_token if ENGINE else ""
-
-        if not server_url:
+        api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
+        if not api_key:
             await websocket.send(json.dumps({
                 "type": "profile_extracted",
                 "profile": {},
@@ -284,7 +236,16 @@ async def extract_and_send_profile(websocket, resume_text: str):
             }))
             return
 
-        # Use server /ai/answer to extract profile
+        use_deepseek = not os.environ.get("OPENAI_API_KEY")
+        from openai import AsyncOpenAI
+
+        if use_deepseek:
+            client = AsyncOpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+            model = "deepseek-chat"
+        else:
+            client = AsyncOpenAI(api_key=api_key)
+            model = "gpt-4o-mini"
+
         extract_prompt = (
             "Extract structured info from this resume/CV. "
             "Return JSON only: "
@@ -292,23 +253,18 @@ async def extract_and_send_profile(websocket, resume_text: str):
             '"summary":"2-3 sentence professional summary highlighting key achievements",'
             '"skills":["skill1","skill2",...up to 15 most relevant skills]}'
         )
-        headers = {"Authorization": f"Bearer {server_token}"}
-        result_text = ""
-        async with httpx.AsyncClient(timeout=30) as client:
-            async with client.stream("POST", f"{server_url}/ai/answer",
-                json={
-                    "question": resume_text[:6000],
-                    "question_type": "general",
-                    "meeting_type": "general",
-                    "language": "en",
-                    "context": extract_prompt,
-                }, headers=headers) as resp:
-                async for line in resp.aiter_lines():
-                    if line.startswith("data: "):
-                        token = line[6:]
-                        if token == "[DONE]":
-                            break
-                        result_text += token
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": extract_prompt},
+                {"role": "user", "content": resume_text[:6000]},
+            ],
+            max_tokens=500,
+            temperature=0,
+        )
+
+        result_text = response.choices[0].message.content or ""
 
         import re
         match = re.search(r"\{[\s\S]*\}", result_text)
@@ -329,7 +285,6 @@ async def extract_and_send_profile(websocket, resume_text: str):
 
 
 async def main():
-    # Log to both console and file so we can debug Finder launches
     log_path = os.path.join(os.path.expanduser("~"), "voxclar-engine.log")
     logging.basicConfig(
         level=logging.INFO,
@@ -339,7 +294,7 @@ async def main():
             logging.FileHandler(log_path, mode="w"),
         ],
     )
-    logger.info(f"Starting IMEET.AI Local Engine on ws://localhost:9876 (log: {log_path})")
+    logger.info(f"Starting Voxclar Lifetime Engine on ws://localhost:9876 (log: {log_path})")
 
     async with websockets.serve(handle_client, "localhost", 9876):
         await asyncio.Future()  # run forever

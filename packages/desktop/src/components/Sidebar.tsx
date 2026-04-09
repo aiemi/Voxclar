@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/stores/authStore'
 import { useMeetingStore } from '@/stores/meetingStore'
 import { useEngineStore } from '@/stores/engineStore'
-import { LayoutDashboard, MessageSquare, User, CreditCard, Settings, LogOut, FileText } from 'lucide-react'
+import { LayoutDashboard, MessageSquare, User, Settings, LogOut, FileText } from 'lucide-react'
 import clsx from 'clsx'
 
 const electronAPI = (window as unknown as { electronAPI?: {
@@ -15,7 +15,6 @@ const NAV_ITEMS = [
   { path: '/meeting', icon: MessageSquare, labelKey: 'nav.meeting' },
   { path: '/records', icon: FileText, labelKey: 'nav.records' },
   { path: '/profile', icon: User, labelKey: 'nav.profile' },
-  { path: '/subscription', icon: CreditCard, labelKey: 'nav.subscription' },
   { path: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ]
 
@@ -23,8 +22,7 @@ export default function Sidebar() {
   const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
-  const user = useAuthStore((s) => s.user)
-  const storeLogout = useAuthStore((s) => s.logout)
+  const deactivate = useAuthStore((s) => s.deactivate)
   const { isRecording, reset: resetMeeting } = useMeetingStore()
   const engineStatus = useEngineStore((s) => s.status)
 
@@ -40,7 +38,7 @@ export default function Sidebar() {
       resetMeeting()
     }
     electronAPI?.caption.hide()
-    storeLogout()
+    deactivate()
     navigate('/')
   }
 
@@ -61,6 +59,7 @@ export default function Sidebar() {
           <span className="text-imeet-gold">Vox</span>
           <span className="text-white">clar</span>
         </h1>
+        <p className="text-[10px] text-purple-400/70 -mt-0.5">Lifetime</p>
       </div>
 
       <nav className="flex-1 px-3 space-y-0.5">
@@ -94,15 +93,13 @@ export default function Sidebar() {
       <div className="p-4 mx-3 mb-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
         <div className="flex items-center justify-between">
           <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{user?.username || t('common.user')}</p>
-            <p className="text-[11px] text-imeet-gold">
-              {user?.subscription_tier === 'lifetime' ? `∞ ${t('sidebar.lifetime')}` : `${user?.points_balance ?? 10} ${t('sidebar.min_left')}`}
-            </p>
+            <p className="text-sm font-medium truncate text-purple-400">Lifetime</p>
+            <p className="text-[11px] text-imeet-text-muted">Local AI Engine</p>
           </div>
           <button
             onClick={handleLogout}
             className="text-white/30 hover:text-red-400 transition-colors p-1"
-            title={t('sidebar.logout')}
+            title="Deactivate"
           >
             <LogOut size={15} />
           </button>

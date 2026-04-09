@@ -1,7 +1,7 @@
 {
-  "name": "voxclar-desktop",
+  "name": "voxclar-lifetime",
   "version": "2.0.0",
-  "description": "Voxclar - AI-Powered Meeting Assistant",
+  "description": "Voxclar Lifetime - AI-Powered Meeting Assistant",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -47,7 +47,7 @@
   },
   "build": {
     "appId": "com.voxclar.desktop",
-    "productName": "Voxclar",
+    "productName": "Voxclar Lifetime",
     "directories": {
       "buildResources": "build"
     },

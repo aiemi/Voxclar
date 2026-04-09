@@ -2,7 +2,6 @@ import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Save, Plus, X, Upload, User, Briefcase, FileText, CheckCircle, File } from 'lucide-react'
 import { saveProfileLocal } from '@/services/storage'
-import { useAuthStore } from '@/stores/authStore'
 
 interface ResumeItem {
   name: string
@@ -21,8 +20,7 @@ interface ProfileData {
 
 function loadProfileLocal(): ProfileData {
   try {
-    const userId = useAuthStore.getState().user?.id || 'anonymous'
-    const raw = localStorage.getItem(`voxclar_${userId}_profile`)
+    const raw = localStorage.getItem('voxclar_lifetime_profile')
     if (raw) {
       const data = JSON.parse(raw)
       return { name: '', headline: '', summary: '', skills: [], resumes: [], context: '', ...data }
@@ -217,27 +215,6 @@ export default function Profile() {
 
     const data: ProfileData = { name, headline, summary, skills, resumes, context }
     saveProfileLocal(data)
-
-    // Also save condensed context to server DB
-    try {
-      const { api } = await import('@/services/api')
-      await api.updateProfile({ full_name: name, headline, summary, skills })
-      // Save condensed context for meeting AI
-      await fetch(
-        // @ts-ignore
-        (import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1') + '/ai/context',
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
-          },
-          body: JSON.stringify({ condensed_context: context }),
-        }
-      )
-    } catch (e) {
-      console.warn('Server profile save failed:', e)
-    }
 
     setSaveStatus('saved')
     setTimeout(() => setSaveStatus('idle'), 2000)

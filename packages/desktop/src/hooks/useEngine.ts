@@ -27,15 +27,7 @@ export function useEngine() {
     socket.onopen = () => {
       reconnectAttempt.current = 0
       updateStatus('ready')
-      // Send server config immediately so engine can use it for profile extraction etc.
-      // @ts-ignore
-      const serverApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
-      const serverToken = localStorage.getItem('access_token') || ''
-      socket.send(JSON.stringify({
-        type: 'set_config',
-        server_api_url: serverApiUrl,
-        server_token: serverToken,
-      }))
+      // No server config needed in lifetime version
     }
 
     socket.onmessage = (event) => {
@@ -48,7 +40,6 @@ export function useEngine() {
             msg.is_final || false,
             (msg.speaker as 'user' | 'other') || 'other',
           )
-          // 系统音频直接推到字幕窗口 — 不经过 store 累积
           if (msg.speaker === 'other') {
             electronAPI?.caption.update({
               transcript: {
@@ -71,7 +62,6 @@ export function useEngine() {
         case 'answer':
           if (msg.token) {
             appendAnswerToken(msg.token)
-            // AI 回答 token 也直接推到字幕
             const latestAnswer = useMeetingStore.getState().answers
             const last = latestAnswer[latestAnswer.length - 1]
             if (last) {
@@ -94,7 +84,6 @@ export function useEngine() {
           }
           break
         case 'meeting_summary':
-          // AI 会议摘要生成完成
           if (msg.summary) {
             useMeetingStore.getState().setLastRecordSummary(msg.summary as string)
           }
@@ -141,10 +130,10 @@ export function useEngine() {
   }, [])
 
   const startMeeting = useCallback(async (config: MeetingConfig) => {
-    // 清空字幕窗口上一次会议的内容
+    // Clear caption window
     electronAPI?.caption.update({ transcript: null, answer: null })
 
-    // 加载 profile context (per-user)
+    // Load profile context
     let profileContext = ''
     try {
       const { loadProfile } = await import('@/services/storage')
@@ -152,34 +141,28 @@ export function useEngine() {
       if (profile) profileContext = profile.context || ''
     } catch {}
 
-    // 加载历史记忆 (per-user)
+    // Load memory
     let memoryData = ''
     try {
       const { loadMemory } = await import('@/services/storage')
       memoryData = loadMemory()
     } catch {}
 
-    // Determine ASR mode based on subscription tier
-    const { useAuthStore } = await import('@/stores/authStore')
-    const user = useAuthStore.getState().user
-    const isLifetime = user?.subscription_tier === 'lifetime'
+    // Load user config (API keys, ASR mode)
+    let asrMode = 'local'
+    let aiModel = 'auto'
+    const userApiKeys: Record<string, string> = {}
 
-    // All users go through server for AI. Only ASR differs.
-    let asrMode = 'server'  // Default: server Deepgram proxy
-    // @ts-ignore
-    const serverApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
-    const serverToken = localStorage.getItem('access_token') || ''
-
-    if (isLifetime) {
-      // Lifetime can choose local ASR (faster-whisper) to save minutes
-      try {
-        const { loadLifetimeConfig } = await import('@/services/storage')
-        const lc = loadLifetimeConfig()
-        if (lc?.asr_mode === 'local') {
-          asrMode = 'local'
-        }
-      } catch {}
-    }
+    try {
+      const { loadLifetimeConfig } = await import('@/services/storage')
+      const lc = loadLifetimeConfig()
+      if (lc) {
+        asrMode = lc.asr_mode || 'local'
+        aiModel = lc.ai_model || 'auto'
+        if (lc.openai_api_key) userApiKeys['OPENAI_API_KEY'] = lc.openai_api_key
+        if (lc.deepgram_api_key) userApiKeys['DEEPGRAM_API_KEY'] = lc.deepgram_api_key
+      }
+    } catch {}
 
     sendMessage({
       type: 'start_meeting',
@@ -192,8 +175,8 @@ export function useEngine() {
       prep_docs_summary: config.prep_notes,
       memory_data: memoryData,
       asr_mode: asrMode,
-      server_api_url: serverApiUrl,
-      server_token: serverToken,
+      ai_model: aiModel,
+      user_api_keys: userApiKeys,
     })
   }, [sendMessage])
 

@@ -1,17 +1,16 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+// import { useNavigate } from 'react-router-dom'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import TextAlign from '@tiptap/extension-text-align'
 import Highlight from '@tiptap/extension-highlight'
 import { useMeetingStore } from '@/stores/meetingStore'
-import { loadRecordsSync, loadRecords } from '@/services/storage'
-import { useAuthStore } from '@/stores/authStore'
+import { loadRecordsSync } from '@/services/storage'
 import type { MeetingRecord } from '@/types'
 import {
-  Clock, MessageSquare, FileText, Lock, Copy, CheckCircle,
+  Clock, Copy, CheckCircle,
   FileDown, Bold, Italic, List, ListOrdered, AlignLeft, AlignCenter,
   Heading2, Highlighter, Undo, Redo, Eye, Pencil, Trash2,
 } from 'lucide-react'
@@ -80,49 +79,24 @@ function ToolbarButton({ onClick, active, children, title }: {
 
 export default function MeetingRecordPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const { lastRecord } = useMeetingStore()
-  const user = useAuthStore((s) => s.user)
   const [records, setRecords] = useState<MeetingRecord[]>(() => loadRecordsSync())
   const [selectedId, setSelectedId] = useState<string | null>(lastRecord?.meeting.id || records[0]?.meeting.id || null)
   const [copied, setCopied] = useState(false)
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
-  const [cloudLoading, setCloudLoading] = useState(false)
-
-  const isCloudUser = user?.subscription_tier === 'standard' || user?.subscription_tier === 'pro'
-
-  // Load cloud records for subscribers
-  useEffect(() => {
-    if (!isCloudUser) return
-    setCloudLoading(true)
-    loadRecords().then((cloudRecords) => {
-      if (cloudRecords.length > 0) {
-        // Merge: cloud records + any local-only records (from lastRecord)
-        const cloudIds = new Set(cloudRecords.map((r) => r.meeting.id))
-        const localOnly = records.filter((r) => !cloudIds.has(r.meeting.id))
-        const merged = [...localOnly, ...cloudRecords]
-        setRecords(merged)
-        if (!selectedId && merged.length > 0) {
-          setSelectedId(merged[0].meeting.id)
-        }
-      }
-    }).catch(() => {}).finally(() => setCloudLoading(false))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteRecord = (id: string) => {
     const updated = records.filter((r) => r.meeting.id !== id)
     setRecords(updated)
-    // Sync to per-user localStorage
-    const userId = user?.id || 'anonymous'
     try {
-      localStorage.setItem(`voxclar_${userId}_records`, JSON.stringify(updated))
+      localStorage.setItem('voxclar_lifetime_records', JSON.stringify(updated))
     } catch {}
     if (selectedId === id) {
       setSelectedId(updated[0]?.meeting.id || null)
     }
   }
 
-  const isPremium = user?.subscription_tier && user.subscription_tier !== 'free'
+  const isPremium = true  // Lifetime = always premium
   const record = selectedId
     ? (lastRecord?.meeting.id === selectedId ? lastRecord : records.find((r) => r.meeting.id === selectedId))
     : null
@@ -155,14 +129,6 @@ export default function MeetingRecordPage() {
     const title = record.meeting.title || t('records.untitled')
     const html = wrapInPDFTemplate(editorHtml, record)
     await electronAPI.export.savePDF(html, `Voxclar-${title.replace(/\s+/g, '_')}.pdf`)
-  }
-
-  if (cloudLoading) {
-    return (
-      <div className="h-[calc(100vh-7rem)] flex items-center justify-center">
-        <p className="text-sm text-imeet-text-muted">{t('common.loading')}</p>
-      </div>
-    )
   }
 
   if (!record && records.length === 0) {
@@ -291,16 +257,6 @@ export default function MeetingRecordPage() {
                 </ToolbarButton>
 
                 <div className="flex-1" />
-
-                {/* AI Summary Badge */}
-                {!isPremium && (
-                  <button
-                    onClick={() => navigate('/subscription')}
-                    className="flex items-center gap-1 text-[10px] bg-imeet-gold/10 text-imeet-gold px-2 py-1 rounded-full hover:bg-imeet-gold/20 transition-colors"
-                  >
-                    <Lock size={10} /> AI Summary — Upgrade
-                  </button>
-                )}
               </div>
             )}
 

@@ -3,11 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useEngine } from '@/hooks/useEngine'
 import { useMeetingStore } from '@/stores/meetingStore'
-import { useAuthStore } from '@/stores/authStore'
-import { api } from '@/services/api'
 import type { MeetingType } from '@/types'
 import { Play, Square, Clock, MonitorUp, Upload, File, X, Loader2, Shield, Zap, Brain, Mic, MessageSquare } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import { loadLifetimeConfig } from '@/services/storage'
 
 const electronAPI = (window as unknown as { electronAPI?: {
   caption: { show: () => void; hide: () => void; toggle: () => Promise<boolean>; update: (data: unknown) => void }
@@ -83,29 +82,11 @@ export default function Meeting() {
         })
         ws.close()
         setPrepFiles((prev) => [...prev, { name: file.name, summary }])
-
-        // Auto-fill prep notes with condensed summary
         setPrepNotes((prev) => prev ? `${prev}\n\n[${file.name}]\n${summary}` : `[${file.name}]\n${summary}`)
-
-        // Auto-fill meeting topic from filename if empty
         if (!title) {
           const topicFromFile = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ')
           setTitle(topicFromFile)
         }
-
-        // Save condensed prep summary to server DB
-        try {
-          // @ts-ignore
-          const serverApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
-          fetch(`${serverApiUrl}/ai/context`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('access_token') || ''}`,
-            },
-            body: JSON.stringify({ prep_docs_summary: summary }),
-          }).catch(() => {})
-        } catch {}
       } catch {
         setPrepFiles((prev) => [...prev, { name: file.name, summary: '(failed)' }])
       }
@@ -121,48 +102,15 @@ export default function Meeting() {
       ...prepFiles.map((f) => `[${f.name}]\n${f.summary}`),
     ].filter(Boolean).join('\n\n')
 
-    let meetingId = crypto.randomUUID()
-    const user = useAuthStore.getState().user
-    const isLifetime = user?.subscription_tier === 'lifetime'
-
-    // Lifetime users: must have OpenAI API key on server
-    if (isLifetime) {
-      try {
-        const keys = await api.getApiKeys()
-        if (!keys.openai_key) {
-          alert(t('meeting.no_api_key') || 'Please add your OpenAI API key in Settings first.')
-          navigate('/settings')
-          return
-        }
-      } catch {
-        alert('Cannot verify API keys. Please check your connection.')
-        return
-      }
-      // If using cloud ASR, check balance
-      const { loadLifetimeConfig } = await import('@/services/storage')
-      const lc = loadLifetimeConfig()
-      if (!lc?.asr_mode || lc.asr_mode !== 'local') {
-        if ((user?.asr_balance || 0) <= 0) {
-          alert(t('meeting.insufficient_minutes') || 'Insufficient Cloud ASR minutes. Please top up or switch to Local ASR in Settings.')
-          return
-        }
-      }
+    // Check if OpenAI key is configured
+    const lc = loadLifetimeConfig()
+    if (!lc?.openai_api_key) {
+      alert('Please add your OpenAI API key in Settings first.')
+      navigate('/settings')
+      return
     }
 
-    if (!isLifetime) {
-      try {
-        const serverMeeting = await api.createMeeting({
-          title, meeting_type: meetingType, language, prep_notes: allPrepNotes,
-        })
-        meetingId = serverMeeting.id
-      } catch (err: any) {
-        console.error('Failed to create meeting:', err)
-        if (err?.message?.includes('Insufficient') || err?.message?.includes('402')) {
-          alert(t('meeting.insufficient_minutes'))
-          return
-        }
-      }
-    }
+    const meetingId = crypto.randomUUID()
 
     store.startMeeting({
       id: meetingId,
@@ -182,44 +130,10 @@ export default function Meeting() {
 
   const handleStop = async () => {
     stopMeeting()
-    const meeting = store.activeMeeting
     store.stopMeeting()
     clearInterval(timerRef.current)
     electronAPI?.caption.hide()
     setCaptionVisible(false)
-
-    const user = useAuthStore.getState().user
-    const isLifetime = user?.subscription_tier === 'lifetime'
-
-    if (meeting && !isLifetime) {
-      try {
-        await api.endMeeting(meeting.id)
-        const updatedUser = await api.getCurrentUser()
-        useAuthStore.getState().updateUser(updatedUser)
-      } catch (err) {
-        console.warn('End meeting failed:', err)
-      }
-
-      if (user && ['standard', 'pro'].includes(user.subscription_tier)) {
-        api.syncMeetingRecord({
-          meeting_id: meeting.id,
-          transcripts: store.transcripts.map((t) => ({
-            speaker: t.speaker,
-            text: t.text,
-            timestamp_ms: t.timestamp_ms,
-            is_question: t.is_question,
-          })),
-          answers: store.answers.map((a) => ({
-            question_text: a.question_text,
-            answer_text: a.answer_text,
-            question_type: a.question_type,
-            model_used: a.model_used,
-          })),
-          summary: store.lastRecord?.summary,
-        }).catch((err) => console.warn('Sync failed:', err))
-      }
-    }
-
     setTimeout(() => navigate('/records'), 500)
   }
 
@@ -425,17 +339,12 @@ export default function Meeting() {
 
 function formatAnswer(text: string): string {
   return text
-    // Headers
     .replace(/^### (.*?)$/gm, '<h4 class="font-semibold text-imeet-gold mt-3 mb-1">$1</h4>')
     .replace(/^## (.*?)$/gm, '<h3 class="font-semibold text-imeet-gold mt-3 mb-1">$1</h3>')
-    // Bold
     .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
-    // Bullet lists
     .replace(/^[-•] (.*?)$/gm, '<li class="ml-4 list-disc">$1</li>')
     .replace(/^(\d+)\. (.*?)$/gm, '<li class="ml-4 list-decimal">$1. $2</li>')
-    // Inline code
     .replace(/`([^`]+)`/g, '<code class="bg-white/10 px-1 rounded text-xs">$1</code>')
-    // Paragraphs
     .replace(/\n\n/g, '<div class="h-2"></div>')
     .replace(/\n/g, '<br/>')
 }

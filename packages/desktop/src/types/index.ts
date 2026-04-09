@@ -1,17 +1,3 @@
-export interface User {
-  id: string
-  email: string
-  username: string
-  avatar_url?: string
-  subscription_tier: 'free' | 'standard' | 'pro' | 'lifetime'
-  subscription_expires_at?: string
-  points_balance: number
-  topup_balance: number
-  asr_balance: number
-  is_active: boolean
-  created_at: string
-}
-
 export interface Meeting {
   id: string
   title?: string
@@ -56,28 +42,20 @@ export interface Answer {
   rating?: number
 }
 
-export interface Transaction {
-  id: string
-  type: 'purchase' | 'consume' | 'bonus' | 'refund'
-  points: number
-  amount_usd?: number
-  description?: string
-  created_at: string
-}
-
 export interface MeetingRecord {
   meeting: Meeting
   transcripts: Transcript[]
   answers: Answer[]
-  summary?: string          // AI 摘要（高级会员）
+  summary?: string
   summaryGenerating?: boolean
 }
 
 export interface EngineMessage {
-  type: 'transcription' | 'question_detected' | 'answer' | 'engine_status' | 'error' | 'pong'
+  type: 'transcription' | 'question_detected' | 'answer' | 'engine_status' | 'error' | 'pong' | 'save_memory' | 'meeting_summary'
   text?: string
   is_final?: boolean
   speaker?: string
+  speaker_label?: string
   language?: string
   timestamp_ms?: number
   question?: string
@@ -87,6 +65,8 @@ export interface EngineMessage {
   status?: string
   details?: Record<string, unknown>
   message?: string
+  memory?: unknown
+  summary?: unknown
 }
 
 export interface MeetingConfig {
@@ -95,14 +75,4 @@ export interface MeetingConfig {
   language: string
   audio_source: 'system' | 'mic'
   prep_notes?: string
-}
-
-export interface UserStats {
-  total_meetings: number
-  total_duration_minutes: number
-  meetings_this_month: number
-  points_balance: number
-  topup_balance: number
-  asr_balance: number
-  subscription_tier: string
 }

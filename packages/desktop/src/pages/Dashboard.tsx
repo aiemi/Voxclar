@@ -1,23 +1,21 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAuthStore } from '@/stores/authStore'
 import { useEngineStore } from '@/stores/engineStore'
-import { api } from '@/services/api'
-import { Mic, Activity, Play, Zap, Shield, Globe, Timer, FileText, Brain, CloudCog } from 'lucide-react'
+import { Mic, Play, Zap, Shield, FileText, Brain } from 'lucide-react'
 import clsx from 'clsx'
 import AnimatedText from '@/components/AnimatedText'
-import type { UserStats } from '@/types'
+import { loadRecordsSync } from '@/services/storage'
 
 export default function Dashboard() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const user = useAuthStore((s) => s.user)
   const engineStatus = useEngineStore((s) => s.status)
-  const [stats, setStats] = useState<UserStats | null>(null)
+  const [meetingCount, setMeetingCount] = useState(0)
 
   useEffect(() => {
-    api.getUserStats().then(setStats).catch(() => {})
+    const records = loadRecordsSync()
+    setMeetingCount(records.length)
   }, [])
 
   const statusColor = {
@@ -35,13 +33,10 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-2xl font-bold">
-              <AnimatedText text={`${t('dashboard.welcome')}, `} />
-              <AnimatedText text={user?.username || t('common.user')} className="text-imeet-gold" />
+              <AnimatedText text={`${t('dashboard.welcome')}`} />
             </h2>
-            <p className="text-white/[0.35] text-sm mt-1">
-              {user?.subscription_tier
-                ? `${user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)} ${t('dashboard.plan_suffix')}`
-                : t('dashboard.free_plan')}
+            <p className="text-white/[0.35] text-sm mt-1 flex items-center gap-1.5">
+              <span className="text-purple-400 font-medium">Lifetime</span> Edition
             </p>
           </div>
           {/* Engine status pill */}
@@ -60,7 +55,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className={`grid grid-cols-1 ${user?.subscription_tier === 'lifetime' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-[#1a1a1a] rounded-[20px_4px_20px_20px] border border-white/[0.08] p-5 hover:-translate-y-1 transition-transform duration-300">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
@@ -68,42 +63,19 @@ export default function Dashboard() {
             </div>
             <span className="text-sm text-white/[0.5]">{t('dashboard.stats.meetings')}</span>
           </div>
-          <p className="text-3xl font-bold">{stats?.total_meetings ?? 0}</p>
+          <p className="text-3xl font-bold">{meetingCount}</p>
         </div>
-        <div className={`bg-[#1a1a1a] ${user?.subscription_tier === 'lifetime' ? '' : 'rounded-[4px_20px_20px_20px]'} border border-white/[0.08] p-5 hover:-translate-y-1 transition-transform duration-300`} style={{ borderRadius: user?.subscription_tier === 'lifetime' ? '4px 4px 20px 20px' : undefined }}>
+        <div className="bg-[#1a1a1a] rounded-[4px_20px_20px_20px] border border-white/[0.08] p-5 hover:-translate-y-1 transition-transform duration-300">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-xl bg-imeet-gold/10 flex items-center justify-center">
-              <Timer size={18} className="text-imeet-gold" />
+            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
+              <Shield size={18} className="text-purple-400" />
             </div>
-            <span className="text-sm text-white/[0.5]">{user?.subscription_tier === 'lifetime' ? t('dashboard.license') : t('dashboard.time_left')}</span>
+            <span className="text-sm text-white/[0.5]">License</span>
           </div>
-          {user?.subscription_tier === 'lifetime'
-            ? <p className="text-3xl font-bold text-purple-400">∞ <span className="text-base font-normal text-white/[0.35]">{t('dashboard.unlimited')}</span></p>
-            : <p className="text-3xl font-bold text-imeet-gold">{user?.points_balance ?? 10} <span className="text-base font-normal text-white/[0.35]">{t('common.minutes')}</span></p>
-          }
+          <p className="text-3xl font-bold text-purple-400">
+            Lifetime
+          </p>
         </div>
-        {user?.subscription_tier === 'lifetime' && (
-          <div className="bg-[#1a1a1a] rounded-[4px_20px_20px_20px] border border-white/[0.08] p-5 hover:-translate-y-1 transition-transform duration-300">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
-                <CloudCog size={18} className="text-cyan-400" />
-              </div>
-              <span className="text-sm text-white/[0.5]">{t('dashboard.cloud_asr')}</span>
-            </div>
-            <p className="text-3xl font-bold text-cyan-400">
-              {stats?.asr_balance ?? user?.asr_balance ?? 0}
-              <span className="text-base font-normal text-white/[0.35]"> {t('common.minutes')}</span>
-            </p>
-            {(stats?.asr_balance ?? 0) <= 10 && (
-              <button
-                onClick={() => navigate('/subscription')}
-                className="mt-2 text-xs text-cyan-400/70 hover:text-cyan-400 transition-colors"
-              >
-                {t('dashboard.buy_asr_minutes')} →
-              </button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Feature Grid */}
