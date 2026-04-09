@@ -159,16 +159,39 @@ async def handle_client(websocket):
 
 
 async def summarize_and_send(websocket, text: str, doc_type: str, doc_id: str):
-    """浓缩文档并返回摘要 — 理解后压缩，不截取。"""
+    """通过服务器 AI 浓缩文档。"""
     try:
-        from src.ai.document_summarizer import summarize_document
+        import httpx
+        server_url = ENGINE._server_api_url if ENGINE else ""
+        server_token = ENGINE._server_token if ENGINE else ""
         logger.info(f"Summarizing document: {doc_id} ({len(text)} chars)")
-        summary = await summarize_document(text, doc_type)
+
+        if not server_url:
+            raise ValueError("No server URL")
+
+        headers = {"Authorization": f"Bearer {server_token}"}
+        summary = ""
+        async with httpx.AsyncClient(timeout=60) as client:
+            async with client.stream("POST", f"{server_url}/ai/answer",
+                json={
+                    "question": text[:6000],
+                    "question_type": "general",
+                    "meeting_type": "general",
+                    "language": "en",
+                    "context": f"Summarize this {doc_type} document concisely. Keep key information.",
+                }, headers=headers) as resp:
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        token = line[6:]
+                        if token == "[DONE]":
+                            break
+                        summary += token
+
         logger.info(f"Document summarized: {doc_id} → {len(summary)} chars")
         await websocket.send(json.dumps({
             "type": "document_summarized",
             "doc_id": doc_id,
-            "summary": summary,
+            "summary": summary or text[:2000],
         }))
     except Exception as e:
         logger.error(f"Document summarization failed: {e}")
@@ -231,16 +254,13 @@ def parse_file_content(file_bytes: bytes, filename: str) -> str:
 
 
 async def extract_and_send_profile(websocket, resume_text: str):
-    """用 AI 从简历提取结构化信息，同时返回解析后的文本。"""
+    """通过服务器 AI 从简历提取结构化信息。"""
     try:
-        from openai import AsyncOpenAI
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        use_deepseek = False
-        if not api_key:
-            api_key = os.environ.get("DEEPSEEK_API_KEY", "")
-            use_deepseek = True
-        if not api_key:
-            # 无 API key，只返回文本
+        import httpx
+        server_url = ENGINE._server_api_url if ENGINE else ""
+        server_token = ENGINE._server_token if ENGINE else ""
+
+        if not server_url:
             await websocket.send(json.dumps({
                 "type": "profile_extracted",
                 "profile": {},
@@ -248,34 +268,34 @@ async def extract_and_send_profile(websocket, resume_text: str):
             }))
             return
 
-        if use_deepseek:
-            client = AsyncOpenAI(api_key=api_key, base_url="https://api.deepseek.com")
-            model = "deepseek-chat"
-        else:
-            client = AsyncOpenAI(api_key=api_key)
-            model = "gpt-4o-mini"
-
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Extract structured info from this resume/CV. "
-                        "Return JSON only: "
-                        '{"name":"full name","headline":"most recent role + company",'
-                        '"summary":"2-3 sentence professional summary highlighting key achievements",'
-                        '"skills":["skill1","skill2",...up to 15 most relevant skills]}'
-                    ),
-                },
-                {"role": "user", "content": resume_text[:6000]},
-            ],
-            max_tokens=600,
-            temperature=0,
+        # Use server /ai/answer to extract profile
+        extract_prompt = (
+            "Extract structured info from this resume/CV. "
+            "Return JSON only: "
+            '{"name":"full name","headline":"most recent role + company",'
+            '"summary":"2-3 sentence professional summary highlighting key achievements",'
+            '"skills":["skill1","skill2",...up to 15 most relevant skills]}'
         )
-        content = response.choices[0].message.content or ""
+        headers = {"Authorization": f"Bearer {server_token}"}
+        result_text = ""
+        async with httpx.AsyncClient(timeout=30) as client:
+            async with client.stream("POST", f"{server_url}/ai/answer",
+                json={
+                    "question": resume_text[:6000],
+                    "question_type": "general",
+                    "meeting_type": "general",
+                    "language": "en",
+                    "context": extract_prompt,
+                }, headers=headers) as resp:
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        token = line[6:]
+                        if token == "[DONE]":
+                            break
+                        result_text += token
+
         import re
-        match = re.search(r"\{[\s\S]*\}", content)
+        match = re.search(r"\{[\s\S]*\}", result_text)
         profile = json.loads(match.group()) if match else {}
 
         await websocket.send(json.dumps({

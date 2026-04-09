@@ -390,6 +390,17 @@ export default function Meeting() {
 
 function formatAnswer(text: string): string {
   return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Headers
+    .replace(/^### (.*?)$/gm, '<h4 class="font-semibold text-imeet-gold mt-3 mb-1">$1</h4>')
+    .replace(/^## (.*?)$/gm, '<h3 class="font-semibold text-imeet-gold mt-3 mb-1">$1</h3>')
+    // Bold
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
+    // Bullet lists
+    .replace(/^[-•] (.*?)$/gm, '<li class="ml-4 list-disc">$1</li>')
+    .replace(/^(\d+)\. (.*?)$/gm, '<li class="ml-4 list-decimal">$1. $2</li>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code class="bg-white/10 px-1 rounded text-xs">$1</code>')
+    // Paragraphs
+    .replace(/\n\n/g, '<div class="h-2"></div>')
     .replace(/\n/g, '<br/>')
 }

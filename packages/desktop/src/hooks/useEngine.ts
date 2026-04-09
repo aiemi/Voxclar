@@ -121,9 +121,14 @@ export function useEngine() {
   }, [])
 
   const sendMessage = useCallback((msg: Record<string, unknown>) => {
-    if (ws.current?.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(msg))
+    const trySend = (retries = 5) => {
+      if (ws.current?.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify(msg))
+      } else if (retries > 0) {
+        setTimeout(() => trySend(retries - 1), 500)
+      }
     }
+    trySend()
   }, [])
 
   const startMeeting = useCallback(async (config: MeetingConfig) => {
