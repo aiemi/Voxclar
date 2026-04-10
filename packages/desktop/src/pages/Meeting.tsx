@@ -122,45 +122,17 @@ export default function Meeting() {
     ].filter(Boolean).join('\n\n')
 
     let meetingId = crypto.randomUUID()
-    const user = useAuthStore.getState().user
-    const isLifetime = user?.subscription_tier === 'lifetime'
 
-    // Lifetime users: must have OpenAI API key on server
-    if (isLifetime) {
-      try {
-        const keys = await api.getApiKeys()
-        if (!keys.openai_key) {
-          alert(t('meeting.no_api_key') || 'Please add your OpenAI API key in Settings first.')
-          navigate('/settings')
-          return
-        }
-      } catch {
-        alert('Cannot verify API keys. Please check your connection.')
+    try {
+      const serverMeeting = await api.createMeeting({
+        title, meeting_type: meetingType, language, prep_notes: allPrepNotes,
+      })
+      meetingId = serverMeeting.id
+    } catch (err: any) {
+      console.error('Failed to create meeting:', err)
+      if (err?.message?.includes('Insufficient') || err?.message?.includes('402')) {
+        alert(t('meeting.insufficient_minutes'))
         return
-      }
-      // If using cloud ASR, check balance
-      const { loadLifetimeConfig } = await import('@/services/storage')
-      const lc = loadLifetimeConfig()
-      if (!lc?.asr_mode || lc.asr_mode !== 'local') {
-        if ((user?.asr_balance || 0) <= 0) {
-          alert(t('meeting.insufficient_minutes') || 'Insufficient Cloud ASR minutes. Please top up or switch to Local ASR in Settings.')
-          return
-        }
-      }
-    }
-
-    if (!isLifetime) {
-      try {
-        const serverMeeting = await api.createMeeting({
-          title, meeting_type: meetingType, language, prep_notes: allPrepNotes,
-        })
-        meetingId = serverMeeting.id
-      } catch (err: any) {
-        console.error('Failed to create meeting:', err)
-        if (err?.message?.includes('Insufficient') || err?.message?.includes('402')) {
-          alert(t('meeting.insufficient_minutes'))
-          return
-        }
       }
     }
 
@@ -189,9 +161,8 @@ export default function Meeting() {
     setCaptionVisible(false)
 
     const user = useAuthStore.getState().user
-    const isLifetime = user?.subscription_tier === 'lifetime'
 
-    if (meeting && !isLifetime) {
+    if (meeting) {
       try {
         await api.endMeeting(meeting.id)
         const updatedUser = await api.getCurrentUser()

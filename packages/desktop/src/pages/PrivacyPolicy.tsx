@@ -36,10 +36,7 @@ export default function PrivacyPolicy() {
             </ul>
 
             <h3 className="text-white/80 font-medium mt-3 mb-1">1.4 Audio Data</h3>
-            <ul className="list-disc pl-5 space-y-1 mt-1">
-              <li><strong className="text-white/80">Local ASR mode:</strong> Audio is processed entirely on your device using faster-whisper. No audio data is transmitted to any server.</li>
-              <li><strong className="text-white/80">Cloud ASR mode:</strong> Audio is streamed to our speech recognition service for real-time transcription. Audio streams are processed in real-time and <strong className="text-white/80">not stored</strong> after transcription is complete.</li>
-            </ul>
+            <p className="mt-1">Audio is captured locally and streamed to our cloud ASR service for real-time transcription over an encrypted connection. Audio streams are processed in real-time and <strong className="text-white/80">not stored</strong> after transcription is complete.</p>
 
             <h3 className="text-white/80 font-medium mt-3 mb-1">1.5 Payment Information</h3>
             <p>Payments are processed by Stripe. We do not store your credit card number, CVV, or full payment details. We only store your Stripe customer ID and subscription status.</p>

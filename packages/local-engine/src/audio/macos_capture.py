@@ -361,36 +361,27 @@ class MacOSCapture:
 
     @staticmethod
     def _compile_swift_helper() -> str | None:
-        """获取 ScreenCaptureKit Swift helper — 优先用预编译版本。"""
+        """获取 ScreenCaptureKit Swift helper — 优先用预编译版本（原地运行，不复制到/tmp）。"""
         try:
+            import sys
+
+            # 1. 查找预编译的 helper（PyInstaller 打包场景）
+            # 直接从 app bundle 内运行，继承 Voxclar.app 的屏幕录制权限
+            bundled_paths = [
+                os.path.join(os.path.dirname(sys.executable), "imeet_audio_capture"),
+            ]
+            for bundled in bundled_paths:
+                if os.path.exists(bundled) and os.access(bundled, os.X_OK):
+                    logger.info(f"Using bundled Swift helper: {bundled}")
+                    return bundled
+
+            # 2. 检查 /tmp 是否有之前编译好的（开发模式）
             tmp_dir = tempfile.gettempdir()
             binary_path = os.path.join(tmp_dir, "imeet_audio_capture")
-
-            # 已有编译好的 → 直接用
             if os.path.exists(binary_path):
                 return binary_path
 
-            # 查找预编译的 helper（PyInstaller 打包场景）
-            # 在 engine 同级目录或 Resources/engine/ 下
-            import sys
-            bundled_paths = [
-                os.path.join(os.path.dirname(sys.executable), "imeet_audio_capture"),
-                os.path.join(os.path.dirname(os.path.dirname(sys.executable)), "engine", "imeet_audio_capture"),
-            ]
-            # 如果是 frozen（PyInstaller），也检查 _MEIPASS
-            if getattr(sys, 'frozen', False):
-                bundled_paths.insert(0, os.path.join(os.path.dirname(sys.executable), "imeet_audio_capture"))
-
-            for bundled in bundled_paths:
-                if os.path.exists(bundled):
-                    # 复制到 tmp 并设置可执行权限
-                    import shutil
-                    shutil.copy2(bundled, binary_path)
-                    os.chmod(binary_path, 0o755)
-                    logger.info(f"Using pre-compiled Swift helper: {bundled}")
-                    return binary_path
-
-            # Fallback：运行时编译（需要 Xcode Command Line Tools）
+            # 3. Fallback：运行时编译（需要 Xcode Command Line Tools）
             source_path = os.path.join(tmp_dir, "imeet_audio_capture.swift")
             with open(source_path, "w") as f:
                 f.write(_SWIFT_CAPTURE_SOURCE)

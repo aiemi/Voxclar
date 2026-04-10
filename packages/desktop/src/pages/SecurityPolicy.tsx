@@ -27,14 +27,14 @@ export default function SecurityPolicy() {
             <HighlightCard icon={<Lock size={18} />} title="End-to-End Encryption" desc="TLS 1.3 for all data in transit, AES-256 at rest" />
             <HighlightCard icon={<Eye size={18} />} title="Screen Share Safe" desc="Invisible to Zoom, Teams, and Meet screen sharing" />
             <HighlightCard icon={<Server size={18} />} title="Zero Audio Retention" desc="Cloud ASR streams are never stored on our servers" />
-            <HighlightCard icon={<Shield size={18} />} title="Local-First Option" desc="Lifetime users can keep all processing on-device" />
+            <HighlightCard icon={<Shield size={18} />} title="Server-Side Processing" desc="AI and ASR handled securely on our servers" />
           </div>
 
           <Section title="1. Architecture Overview">
             <p>Voxclar uses a hybrid architecture designed to minimize data exposure:</p>
             <ul className="list-disc pl-5 space-y-1 mt-2">
               <li><strong className="text-white/80">Desktop Application:</strong> Electron-based app running locally on your machine. Meeting UI, caption overlay, and local engine operate independently of cloud services.</li>
-              <li><strong className="text-white/80">Local Engine:</strong> Python-based service running on localhost. Handles audio capture, local ASR (faster-whisper), and AI answer generation.</li>
+              <li><strong className="text-white/80">Local Engine:</strong> Python-based service running on localhost. Handles audio capture and relays audio to our cloud ASR and AI services.</li>
               <li><strong className="text-white/80">Cloud Backend:</strong> FastAPI server handling authentication, subscriptions, cloud sync, and ASR API.</li>
             </ul>
           </Section>
@@ -57,15 +57,9 @@ export default function SecurityPolicy() {
           </Section>
 
           <Section title="3. Audio Security">
-            <div className="bg-white/[0.03] rounded-lg p-4 mt-2 space-y-3">
-              <div>
-                <p className="text-white/80 font-medium">Local ASR Mode</p>
-                <p>Audio is captured via ScreenCaptureKit (macOS) or WASAPI (Windows) and processed entirely on your device by faster-whisper. <strong className="text-white/80">No audio data leaves your machine.</strong></p>
-              </div>
-              <div className="border-t border-white/[0.06] pt-3">
-                <p className="text-white/80 font-medium">Cloud ASR Mode</p>
-                <p>Audio is streamed in real-time to our ASR service over an encrypted WebSocket connection. Streams are processed immediately and <strong className="text-white/80">discarded after transcription</strong> — we do not store, log, or retain audio recordings.</p>
-              </div>
+            <div className="bg-white/[0.03] rounded-lg p-4 mt-2">
+              <p className="text-white/80 font-medium">Cloud ASR</p>
+              <p>Audio is captured via ScreenCaptureKit (macOS) or WASAPI (Windows) and streamed in real-time to our ASR service over an encrypted WebSocket connection. Streams are processed immediately and <strong className="text-white/80">discarded after transcription</strong> — we do not store, log, or retain audio recordings.</p>
             </div>
           </Section>
 
@@ -74,7 +68,7 @@ export default function SecurityPolicy() {
               <li>JWT-based authentication with short-lived access tokens</li>
               <li>Refresh tokens with rotation and revocation</li>
               <li>Per-user data isolation — users cannot access other users' data</li>
-              <li>Lifetime licenses are device-locked with hardware fingerprinting</li>
+              <li>Subscription-based access with secure cloud backend</li>
               <li>API keys scoped per user with independent rate limiting</li>
             </ul>
           </Section>
@@ -96,7 +90,7 @@ export default function SecurityPolicy() {
               <li><strong className="text-white/80">OpenAI (GPT):</strong> API data is not used for training per their business terms</li>
               <li><strong className="text-white/80">DeepSeek:</strong> Used for general queries with minimal context</li>
             </ul>
-            <p className="mt-2">Lifetime users provide their own API keys, giving them full control over their AI provider relationship.</p>
+            <p className="mt-2">Your meeting context is processed securely through our server-side AI pipeline.</p>
           </Section>
 
           <Section title="7. Infrastructure Security">

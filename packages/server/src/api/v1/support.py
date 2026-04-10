@@ -24,25 +24,23 @@ SUPPORT_SYSTEM_PROMPT = """You are Voxclar's AI support assistant. You help user
 - Free: 10 minutes, basic transcription + AI
 - Standard ($19.99/mo): 300 minutes, Cloud ASR (Deepgram Nova-2), GPT-5.3
 - Pro ($49.99/mo): 1000 minutes, Claude Sonnet/GPT-5.4/DeepSeek R1, priority support
-- Lifetime ($299 one-time): Unlimited minutes, local ASR (faster-whisper), bring your own API keys, device-locked
+- Lifetime ($299 one-time): Unlimited minutes, all AI models included, priority support
 - Time Boost ($9.99): +120 minutes, never expires
 - ASR Minutes ($4.99): +120 Cloud ASR minutes with API key
 
 **Common Issues & Solutions:**
 1. "No audio captured" → Check system audio permissions. macOS: System Settings > Privacy > Screen Recording. Windows: run as administrator.
 2. "Captions not showing" → Make sure a meeting is active. Click the meeting tab and start a session.
-3. "AI answers are slow" → Try switching to a faster model in Settings. Cloud ASR is faster than local.
+3. "AI answers are slow" → AI answers depend on server load. Try again in a moment.
 4. "Screen sharing shows the app" → Voxclar uses OS-level content protection. If you see it during your own screen share test, that's normal — OTHER participants cannot see it.
 5. "Login issues" → Try logging out and back in. Check your email/password. Use "Forgot Password" if needed.
 6. "Subscription not activated" → Check your email for confirmation. Refresh the app (close and reopen). Contact service@voxclar.com if the issue persists.
 7. "Minutes not added after purchase" → Minutes are added automatically. Restart the app. If still missing, email service@voxclar.com with your transaction ID.
-8. "Local ASR not working" → Local ASR (faster-whisper) requires the model to be downloaded first. Check Settings > ASR Mode.
 
 **Technical Details:**
 - macOS audio: ScreenCaptureKit (13+) or CoreAudio Aggregate Device (12)
 - Windows audio: WASAPI Loopback (pyaudiowpatch)
-- Cloud ASR: Deepgram Nova-2 via WebSocket
-- Local ASR: faster-whisper (Whisper model running locally)
+- ASR: Voxclar Cloud ASR (Deepgram Nova-2) via WebSocket
 - AI Models: Claude (Anthropic), GPT (OpenAI), DeepSeek
 
 **Contact:**

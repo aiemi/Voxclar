@@ -3,15 +3,11 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = []
 binaries = []
-hiddenimports = ['pyaudiowpatch', 'sounddevice', 'scipy.signal', 'openai', 'anthropic', 'websockets', 'websockets.asyncio', 'websockets.asyncio.client', 'websockets.asyncio.server', 'websockets.legacy.server', 'numpy', 'torch']
-tmp_ret = collect_all('faster_whisper')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('ctranslate2')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+hiddenimports = ['pyaudiowpatch', 'sounddevice', 'scipy.signal', 'websockets', 'websockets.asyncio', 'websockets.asyncio.client', 'websockets.asyncio.server', 'websockets.legacy.server', 'numpy']
 
 
 a = Analysis(
-    ['src\\server.py'],
+    ['run_engine.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,
@@ -19,7 +15,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['torch', 'torchvision', 'torchaudio', 'faster_whisper', 'ctranslate2', 'transformers', 'huggingface_hub', 'tokenizers', 'safetensors', 'sklearn', 'scikit-learn', 'openai', 'anthropic', 'numba', 'llvmlite', 'pyarrow', 'pandas', 'PIL', 'cv2', 'matplotlib'],
     noarchive=False,
     optimize=0,
 )

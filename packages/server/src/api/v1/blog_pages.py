@@ -182,7 +182,7 @@ Voxclar is a desktop application (macOS & Windows) that provides real-time AI as
 
 ## How It Works
 1. **Audio Capture** — Captures system audio from Zoom, Teams, Meet, or any meeting app using ScreenCaptureKit (macOS) or WASAPI Loopback (Windows). Never uses your microphone.
-2. **Real-Time Transcription** — Converts speech to text in real-time using cloud ASR (Deepgram Nova-2) or local ASR (faster-whisper). Supports 36+ languages.
+2. **Real-Time Transcription** — Converts speech to text in real-time using Voxclar Cloud ASR (Deepgram Nova-2). Supports 36+ languages.
 3. **Question Detection** — AI analyzes the conversation to identify interview questions as they're asked, using an 8-second sliding window.
 4. **AI Answers** — Generates contextual answers using Claude, GPT, or DeepSeek models. Answers match the language of the question automatically.
 
@@ -198,7 +198,7 @@ Voxclar is a desktop application (macOS & Windows) that provides real-time AI as
 - **Free**: 10 minutes, basic transcription + AI
 - **Standard ($19.99/mo)**: 300 minutes, Cloud ASR, GPT-5.3
 - **Pro ($49.99/mo)**: 1000 minutes, Claude Sonnet/GPT-5.4/DeepSeek R1
-- **Lifetime ($299)**: Unlimited, local ASR, bring your own AI API keys
+- **Lifetime ($299)**: Unlimited usage, all AI models included
 
 ## Supported Platforms
 - macOS 12+ (Intel & Apple Silicon)
@@ -207,7 +207,7 @@ Voxclar is a desktop application (macOS & Windows) that provides real-time AI as
 ## Technology Stack
 - Desktop: Electron + React + TypeScript
 - Audio: ScreenCaptureKit (macOS), WASAPI Loopback (Windows)
-- ASR: Deepgram Nova-2 (cloud), faster-whisper (local)
+- ASR: Deepgram Nova-2 (cloud)
 - AI: Claude (Anthropic), GPT (OpenAI), DeepSeek
 
 ## Pages
@@ -241,7 +241,7 @@ Voxclar is a desktop application for macOS and Windows that helps job candidates
 
 ## Core Capabilities
 1. System audio capture (not microphone) — ScreenCaptureKit on macOS, WASAPI on Windows
-2. Real-time speech-to-text — Deepgram Nova-2 cloud or faster-whisper local
+2. Real-time speech-to-text — Voxclar Cloud ASR (Deepgram Nova-2)
 3. Intelligent question detection — 8-second sliding window with LLM analysis
 4. AI answer generation — Claude, GPT, DeepSeek with automatic language matching
 5. Screen-share invisibility — NSWindowSharingNone / SetWindowDisplayAffinity
@@ -261,13 +261,13 @@ Voxclar is a desktop application for macOS and Windows that helps job candidates
 | Free | $0 | 10 | Basic | Basic |
 | Standard | $19.99/mo | 300 | Cloud (Deepgram) | GPT-5.3 |
 | Pro | $49.99/mo | 1000 | Cloud (Deepgram) | Claude/GPT-5.4/DeepSeek R1 |
-| Lifetime | $299 (one-time) | Unlimited | Local (faster-whisper) | Bring your own keys |
+| Lifetime | $299 (one-time) | Unlimited | Cloud (Deepgram) | All models included |
 
 ## Technical Architecture
 - Frontend: Electron 33 + React 19 + Vite 6 + Tailwind CSS
 - Backend: FastAPI + PostgreSQL + Redis
 - Audio: ScreenCaptureKit (macOS 13+), CoreAudio (macOS 12), WASAPI Loopback (Windows)
-- ASR: Deepgram Nova-2 (streaming WebSocket), faster-whisper (local)
+- ASR: Deepgram Nova-2 (streaming WebSocket)
 - AI: Anthropic Claude API, OpenAI API, DeepSeek API
 
 ## API

@@ -159,27 +159,9 @@ export function useEngine() {
       memoryData = loadMemory()
     } catch {}
 
-    // Determine ASR mode based on subscription tier
-    const { useAuthStore } = await import('@/stores/authStore')
-    const user = useAuthStore.getState().user
-    const isLifetime = user?.subscription_tier === 'lifetime'
-
-    // All users go through server for AI. Only ASR differs.
-    let asrMode = 'server'  // Default: server Deepgram proxy
     // @ts-ignore
     const serverApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001/api/v1'
     const serverToken = localStorage.getItem('access_token') || ''
-
-    if (isLifetime) {
-      // Lifetime can choose local ASR (faster-whisper) to save minutes
-      try {
-        const { loadLifetimeConfig } = await import('@/services/storage')
-        const lc = loadLifetimeConfig()
-        if (lc?.asr_mode === 'local') {
-          asrMode = 'local'
-        }
-      } catch {}
-    }
 
     sendMessage({
       type: 'start_meeting',
@@ -191,7 +173,7 @@ export function useEngine() {
       profile_context: profileContext,
       prep_docs_summary: config.prep_notes,
       memory_data: memoryData,
-      asr_mode: asrMode,
+      asr_mode: 'server',
       server_api_url: serverApiUrl,
       server_token: serverToken,
     })

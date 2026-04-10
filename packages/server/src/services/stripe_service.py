@@ -77,10 +77,10 @@ PLANS = [
         "minutes": -1,
         "features": [
             "One-time purchase",
-            "Local ASR (faster-whisper)",
-            "Bring your own AI keys",
             "Unlimited usage",
-            "Device-locked license",
+            "All AI models included",
+            "Priority support",
+            "All export formats",
             "No cloud sync",
             "Version locked at purchase",
         ],

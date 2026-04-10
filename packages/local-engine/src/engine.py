@@ -2,7 +2,7 @@
 
 统一架构：
   - 音频采集: ScreenCaptureKit (macOS) / WASAPI (Windows)
-  - ASR: 本地 faster-whisper (Lifetime) 或 服务器 Deepgram 代理
+  - ASR: 服务器 Deepgram 代理
   - 问题检测 + AI 回答 + 上下文管理: 全部在服务器完成
   - 引擎只做: 采集音频 → 发服务器, 接收转写/回答 → 发 Electron 显示
 """
@@ -44,11 +44,9 @@ class MeetingEngine:
         self._echo_canceller: EchoCanceller | None = None
         self._system_asr = None
         self._mic_asr = None
-        self._local_asr = None
 
         # State
         self._meeting_start_time = 0.0
-        self._asr_mode = "server"
         self._server_api_url = ""
         self._server_token = ""
 
@@ -66,7 +64,6 @@ class MeetingEngine:
             return
 
         self._meeting_start_time = time.time()
-        self._asr_mode = asr_mode
         self._server_api_url = server_api_url
         self._server_token = server_token
 
@@ -74,33 +71,25 @@ class MeetingEngine:
         self._noise_reducer = AdaptiveNoiseReducer()
         self._echo_canceller = EchoCanceller()
 
-        # ASR setup
-        self._local_asr = None
-        if self._asr_mode == "local":
-            from src.asr.streaming import StreamingASR
-            self._local_asr = StreamingASR(model_size="small", language=language)
-            self._system_asr = None
-            self._mic_asr = None
-            logger.info("Using local ASR (faster-whisper)")
-        else:
-            from src.asr.server_asr_stream import ServerASRStream
-            asr_ws_url = self._server_api_url.replace("http", "ws") + "/asr/stream"
-            logger.info(f"[ASR] ws_url={asr_ws_url}, token={'SET' if self._server_token else 'EMPTY'}")
-            self._system_asr = ServerASRStream(
-                ws_url=asr_ws_url + "&stream_type=system",
-                token=self._server_token,
-                language=language,
-                on_transcript=self._on_system_transcript,
-                on_question_detected=self._on_server_question,
-                on_answer_token=self._on_server_answer,
-            )
-            self._mic_asr = ServerASRStream(
-                ws_url=asr_ws_url + "&stream_type=mic",
-                token=self._server_token,
-                language=language,
-                on_transcript=self._on_mic_transcript,
-            )
-            logger.info("Using server ASR proxy")
+        # ASR setup — always server mode
+        from src.asr.server_asr_stream import ServerASRStream
+        asr_ws_url = self._server_api_url.replace("http", "ws") + "/asr/stream"
+        logger.info(f"[ASR] ws_url={asr_ws_url}, token={'SET' if self._server_token else 'EMPTY'}")
+        self._system_asr = ServerASRStream(
+            ws_url=asr_ws_url + "&stream_type=system",
+            token=self._server_token,
+            language=language,
+            on_transcript=self._on_system_transcript,
+            on_question_detected=self._on_server_question,
+            on_answer_token=self._on_server_answer,
+        )
+        self._mic_asr = ServerASRStream(
+            ws_url=asr_ws_url + "&stream_type=mic",
+            token=self._server_token,
+            language=language,
+            on_transcript=self._on_mic_transcript,
+        )
+        logger.info("Using server ASR proxy")
 
         if self._loop:
             asyncio.run_coroutine_threadsafe(
@@ -128,13 +117,8 @@ class MeetingEngine:
 
         # Start audio capture
         self._capture = DualAudioCaptureManager()
-
-        if self._asr_mode == "local":
-            self._capture.on_system_audio = self._on_system_audio_local
-            self._capture.on_mic_audio = self._on_mic_audio_local
-        else:
-            self._capture.on_system_audio = self._on_system_audio
-            self._capture.on_mic_audio = self._on_mic_audio
+        self._capture.on_system_audio = self._on_system_audio
+        self._capture.on_mic_audio = self._on_mic_audio
 
         self.is_running = True
         self._capture.start_system_audio()
@@ -149,20 +133,17 @@ class MeetingEngine:
         except Exception as e:
             logger.warning(f"Mic capture failed: {e}")
 
-        if self._asr_mode == "local":
-            asyncio.ensure_future(self._local_asr_poll_loop())
-        else:
-            system_ok = await self._system_asr.connect()
-            if not system_ok:
-                logger.error("System ASR connection failed")
-                if self.on_error:
-                    self.on_error({"type": "error", "message": "ASR connection failed.", "fatal": False})
+        system_ok = await self._system_asr.connect()
+        if not system_ok:
+            logger.error("System ASR connection failed")
+            if self.on_error:
+                self.on_error({"type": "error", "message": "ASR connection failed.", "fatal": False})
 
-            mic_ok = await self._mic_asr.connect()
-            if not mic_ok:
-                logger.warning("Mic ASR connection failed (non-critical)")
+        mic_ok = await self._mic_asr.connect()
+        if not mic_ok:
+            logger.warning("Mic ASR connection failed (non-critical)")
 
-        logger.info(f"Meeting started: asr={self._asr_mode}, audio={self._capture.system_capture_method}")
+        logger.info(f"Meeting started: asr=server, audio={self._capture.system_capture_method}")
 
     def stop_meeting(self):
         if not self.is_running:
@@ -220,53 +201,6 @@ class MeetingEngine:
             self._mic_asr.send_audio(audio)
         except Exception as e:
             logger.error(f"Mic audio error: {e}")
-
-    # ═══════════════════════════════════════════════════════════════════
-    # Audio callbacks — local ASR mode
-    # ═══════════════════════════════════════════════════════════════════
-
-    def _on_system_audio_local(self, audio: np.ndarray):
-        if not self.is_running or not self._local_asr:
-            return
-        try:
-            if self._noise_reducer and self._noise_reducer.enabled:
-                audio = self._noise_reducer.process(audio)
-            self._local_asr.feed_audio(audio)
-            if self._echo_canceller:
-                self._echo_canceller.feed_reference(audio)
-        except Exception as e:
-            logger.error(f"Local ASR audio error: {e}")
-
-    def _on_mic_audio_local(self, audio: np.ndarray):
-        pass  # Local mode doesn't run separate mic ASR
-
-    async def _local_asr_poll_loop(self):
-        """Poll local ASR for results every 200ms."""
-        while self.is_running and self._local_asr:
-            result = self._local_asr.get_result()
-            if result and result.get("text"):
-                self._on_system_transcript({
-                    "text": result["text"],
-                    "is_final": result.get("is_final", False),
-                    "language": result.get("language", "en"),
-                })
-                # For local ASR, also feed transcripts to server session for detection
-                if self._server_api_url and result.get("is_final"):
-                    try:
-                        import httpx
-                        headers = {"Authorization": f"Bearer {self._server_token}"}
-                        async with httpx.AsyncClient(timeout=10) as client:
-                            # Feed to server session via detect endpoint (triggers detection)
-                            resp = await client.post(f"{self._server_api_url}/ai/detect",
-                                json={"text": result["text"]}, headers=headers)
-                            if resp.status_code == 200:
-                                detect_result = resp.json()
-                                if detect_result.get("is_question"):
-                                    logger.info(f"[Local ASR] Question detected: {result['text'][:60]}")
-                                    # TODO: trigger server answer generation for local ASR mode
-                    except Exception:
-                        pass
-            await asyncio.sleep(0.2)
 
     # ═══════════════════════════════════════════════════════════════════
     # Transcript + AI event relay (server → Electron)

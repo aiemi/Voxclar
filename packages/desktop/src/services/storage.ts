@@ -136,15 +136,3 @@ export function saveMemory(data: any) {
   localStorage.setItem(localKey('memory'), JSON.stringify(data))
 }
 
-// ── Lifetime Config (always local, per user) ─────────
-
-export function loadLifetimeConfig(): any {
-  try {
-    const raw = localStorage.getItem(localKey('lifetime_config'))
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
-}
-
-export function saveLifetimeConfigStorage(config: any) {
-  localStorage.setItem(localKey('lifetime_config'), JSON.stringify(config))
-}

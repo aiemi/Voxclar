@@ -213,8 +213,8 @@ async def send_lifetime_email(email: str, username: str, license_key: str):
         + _info_table([
             ("License Key", f'<code style="color:#ffdd02;background:#2a2500;padding:2px 8px;border-radius:4px;">{license_key}</code>'),
             ("Plan", "Lifetime — Unlimited"),
-            ("ASR", "Local (faster-whisper)"),
-            ("AI Models", "Bring your own API keys"),
+            ("ASR", "Voxclar Cloud ASR — Unlimited"),
+            ("AI Models", "All models included"),
         ])
         + _text("Your license is device-locked. Set up your AI API keys in Settings to start using AI-powered answers.")
         + _button(WEBSITE_URL, "Open Voxclar")
