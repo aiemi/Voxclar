@@ -69,6 +69,91 @@ async def verify_license(
     return LicenseResponse(**result)
 
 
+# ── Standalone Lifetime app endpoints (no JWT required) ───────────
+# Used by the standalone Lifetime .app distributed via email — the user
+# authenticates by pasting their license key, not by logging in.
+
+@router.post("/license/activate-standalone", response_model=LicenseResponse)
+async def activate_license_standalone(
+    body: LicenseActivateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Activate license by key only — no JWT auth required.
+
+    The Lifetime app has no login flow; users paste the license key from
+    their purchase confirmation email. Also returns the Voxclar Cloud ASR
+    API key and current ASR minute balance.
+    """
+    if not body.license_key:
+        return LicenseResponse(valid=False, error="License key is required")
+    record, user = await stripe_service.activate_license_by_key(
+        db, body.license_key, body.device_id, body.device_name
+    )
+    await db.commit()
+    return LicenseResponse(
+        valid=True,
+        license_key=record.license_key,
+        version=record.version_at_purchase,
+        activated_at=record.activated_at.isoformat() if record.activated_at else None,
+        api_key=user.api_key,
+        asr_balance=user.asr_balance or 0,
+        email=user.email,
+        username=user.username,
+    )
+
+
+@router.post("/asr-topup-checkout-standalone")
+async def asr_topup_checkout_standalone(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create Stripe Checkout for ASR top-up — authenticated by license key.
+
+    Used by the standalone Lifetime app so users can buy more Voxclar Cloud
+    ASR minutes without a JWT.
+    """
+    license_key = body.get("license_key", "")
+    if not license_key:
+        raise HTTPException(status_code=400, detail="license_key is required")
+    url = await stripe_service.create_asr_checkout_by_license(db, license_key)
+    return {"checkout_url": url}
+
+
+@router.post("/license/verify-standalone", response_model=LicenseResponse)
+async def verify_license_standalone(
+    body: LicenseVerifyRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify license by key + device binding — no JWT auth required.
+
+    Also returns current Voxclar Cloud ASR API key and balance so the app
+    can show up-to-date minute counts on each launch.
+    """
+    if not body.license_key:
+        return LicenseResponse(valid=False, reason="License key is required")
+    result = await stripe_service.verify_license_by_key(
+        db, body.license_key, body.device_id
+    )
+    if result.get("valid"):
+        # Load user info for api_key + asr_balance
+        from src.models.license import License
+        lic_result = await db.execute(
+            select(License).where(License.license_key == body.license_key)
+        )
+        lic = lic_result.scalar_one_or_none()
+        if lic:
+            user_result = await db.execute(
+                select(User).where(User.id == lic.user_id)
+            )
+            user = user_result.scalar_one_or_none()
+            if user:
+                result["api_key"] = user.api_key
+                result["asr_balance"] = user.asr_balance or 0
+                result["email"] = user.email
+                result["username"] = user.username
+    return LicenseResponse(**result)
+
+
 @router.get("/transactions", response_model=TransactionListResponse)
 async def get_transactions(
     skip: int = Query(0, ge=0),

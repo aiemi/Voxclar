@@ -187,14 +187,15 @@ async def summarize_and_send(websocket, text: str, doc_type: str, doc_id: str):
 
         headers = {"Authorization": f"Bearer {server_token}"}
         summary = ""
-        async with httpx.AsyncClient(timeout=60) as client:
+        # No truncation — summarization must cover the full document
+        async with httpx.AsyncClient(timeout=120) as client:
             async with client.stream("POST", f"{server_url}/ai/answer",
                 json={
-                    "question": text[:6000],
+                    "question": text,
                     "question_type": "general",
                     "meeting_type": "general",
                     "language": "en",
-                    "context": f"Summarize this {doc_type} document concisely. Keep key information.",
+                    "context": f"Summarize this {doc_type} document concisely. Keep key information from ALL sections and sources.",
                 }, headers=headers) as resp:
                 async for line in resp.aiter_lines():
                     if line.startswith("data: "):
@@ -287,17 +288,21 @@ async def extract_and_send_profile(websocket, resume_text: str):
         # Use server /ai/answer to extract profile
         extract_prompt = (
             "Extract structured info from this resume/CV. "
+            "The input may contain MULTIPLE resumes separated by '=== filename ===' markers — "
+            "if so, synthesize the combined career narrative across ALL resumes, using the most "
+            "recent/relevant info where they differ. "
             "Return JSON only: "
             '{"name":"full name","headline":"most recent role + company",'
-            '"summary":"2-3 sentence professional summary highlighting key achievements",'
-            '"skills":["skill1","skill2",...up to 15 most relevant skills]}'
+            '"summary":"2-3 sentence professional summary highlighting key achievements across all resumes",'
+            '"skills":["skill1","skill2",...up to 15 most relevant skills from all resumes]}'
         )
         headers = {"Authorization": f"Bearer {server_token}"}
         result_text = ""
-        async with httpx.AsyncClient(timeout=30) as client:
+        # No truncation — AI must see all resumes in full to capture complete career history
+        async with httpx.AsyncClient(timeout=120) as client:
             async with client.stream("POST", f"{server_url}/ai/answer",
                 json={
-                    "question": resume_text[:6000],
+                    "question": resume_text,
                     "question_type": "general",
                     "meeting_type": "general",
                     "language": "en",

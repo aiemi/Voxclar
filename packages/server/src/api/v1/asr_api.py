@@ -1,8 +1,11 @@
 """Public Voxclar Cloud ASR API — authenticates via API key, proxies to Deepgram."""
 import asyncio
 import json
+import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Request, HTTPException, Header
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -137,9 +140,13 @@ async def transcribe_stream(websocket: WebSocket):
 
     # Build Deepgram WebSocket URL with params
     params = websocket.query_params
+    raw_lang = params.get("language", "en")
+    # Deepgram doesn't support 'multi' — fall back to English (Deepgram's
+    # detect_language is a paid add-on; we default to English instead).
+    dg_language = "en" if raw_lang in ("multi", "auto", "") else raw_lang
     dg_params = {
         "model": "nova-2",
-        "language": params.get("language", "en"),
+        "language": dg_language,
         "smart_format": params.get("smart_format", "true"),
         "interim_results": params.get("interim_results", "true"),
         "diarize": params.get("diarize", "false"),
@@ -151,12 +158,62 @@ async def transcribe_stream(websocket: WebSocket):
     dg_url = f"{DEEPGRAM_WS_URL}?{query}"
 
     import websockets
+    import time
+
+    user_id = None
+    is_lifetime = False
+    async with async_session_factory() as db:
+        user = await _get_user_by_api_key(db, api_key)
+        if user:
+            user_id = user.id
+            is_lifetime = user.subscription_tier == "lifetime"
+
+    # Deduct from asr_balance while streaming:
+    #   - First deduction at 30 s (>30 s counts as 1 min)
+    #   - Then every 60 s after that
+    #   - Also notify the client of the new balance so the UI updates live
+    # If balance hits 0 mid-session, close the connection gracefully.
+    async def deduct_minutes():
+        if not is_lifetime or not user_id:
+            return
+        await asyncio.sleep(30)  # first minute boundary at 30s
+        while True:
+            try:
+                async with async_session_factory() as db:
+                    u = (await db.execute(
+                        select(User).where(User.id == user_id)
+                    )).scalar_one()
+                    if u.asr_balance <= 0:
+                        logger.info(f"ASR balance exhausted for user {user_id}, closing stream")
+                        try:
+                            await websocket.send_text(json.dumps({
+                                "type": "asr_balance", "balance": 0,
+                            }))
+                            await websocket.close(code=4002, reason="ASR minutes exhausted")
+                        except Exception:
+                            pass
+                        return
+                    u.asr_balance = max(0, u.asr_balance - 1)
+                    await db.commit()
+                    remaining = u.asr_balance
+                    logger.info(f"ASR deducted 1 min for user {user_id}, remaining={remaining}")
+                try:
+                    await websocket.send_text(json.dumps({
+                        "type": "asr_balance", "balance": remaining,
+                    }))
+                except Exception:
+                    pass
+            except Exception:
+                return
+            await asyncio.sleep(60)  # subsequent deductions every 60s
 
     try:
         async with websockets.connect(
             dg_url,
-            extra_headers={"Authorization": f"Token {deepgram_key}"},
+            additional_headers={"Authorization": f"Token {deepgram_key}"},
         ) as dg_ws:
+            deduct_task = asyncio.create_task(deduct_minutes())
+
             # Forward: client audio → Deepgram
             async def forward_audio():
                 try:
@@ -175,6 +232,11 @@ async def transcribe_stream(websocket: WebSocket):
                     pass
 
             await asyncio.gather(forward_audio(), forward_results())
+            deduct_task.cancel()
 
     except Exception as e:
-        await websocket.close(code=4500, reason=str(e))
+        logger.error(f"Cloud ASR stream failed: {e}")
+        try:
+            await websocket.close(code=4500, reason=str(e)[:120])
+        except Exception:
+            pass

@@ -22,6 +22,7 @@ function openUrl(url: string) {
 export default function Subscription() {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
+  const startAggressiveRefresh = useAuthStore((s) => s.startAggressiveRefresh)
   const currentTier = user?.subscription_tier || 'free'
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState<string | null>(null)
@@ -75,6 +76,9 @@ export default function Subscription() {
     setError(null)
     try {
       const { checkout_url } = await api.createCheckout(planId)
+      // Start fast polling so the new tier/balance shows up within seconds
+      // of Stripe firing the webhook, instead of up to 60 s later.
+      startAggressiveRefresh()
       openUrl(checkout_url)
     } catch (err: any) {
       setError(err?.message || 'Failed to connect to server. Please try again.')
@@ -87,6 +91,9 @@ export default function Subscription() {
     setError(null)
     try {
       const { portal_url } = await api.createPortal()
+      // Billing portal can also produce plan changes / cancellations that
+      // land via webhook — poll fast once we've sent the user there.
+      startAggressiveRefresh()
       openUrl(portal_url)
     } catch (err: any) {
       setError(err?.message || 'Failed to open billing portal.')
@@ -98,6 +105,7 @@ export default function Subscription() {
     setError(null)
     try {
       const { checkout_url } = await api.createCheckout('asr_topup')
+      startAggressiveRefresh()
       openUrl(checkout_url)
     } catch (err: any) {
       setError(err?.message || 'Failed to create checkout.')
@@ -111,6 +119,7 @@ export default function Subscription() {
     setError(null)
     try {
       const { checkout_url } = await api.createCheckout('topup')
+      startAggressiveRefresh()
       openUrl(checkout_url)
     } catch (err: any) {
       setError(err?.message || 'Failed to create checkout.')

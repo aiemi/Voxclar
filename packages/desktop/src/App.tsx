@@ -23,18 +23,66 @@ function AuthenticatedApp() {
   useEngine()
   const storeLogout = useAuthStore((s) => s.logout)
   const storeLogin = useAuthStore((s) => s.login)
+  const stopAggressiveRefresh = useAuthStore((s) => s.stopAggressiveRefresh)
 
-  // Validate token on mount — if invalid, force logout
+  // Keep user data in sync with the server:
+  //   1. On mount (also validates the token — bad token → force logout)
+  //   2. Normally every 60 s
+  //   3. Whenever the window regains focus (user Alt-Tabs back)
+  //   4. Every 3 s while aggressive_refresh_until is in the future — set
+  //      by Subscription.tsx when the user kicks off a Stripe checkout so
+  //      the new tier/balance appears within seconds of the webhook.
   useEffect(() => {
-    api.getCurrentUser().then((user) => {
-      const token = localStorage.getItem('access_token')
-      const refresh = localStorage.getItem('refresh_token')
-      if (token && refresh) {
-        storeLogin(user, token, refresh)
+    let mounted = true
+    let interval: ReturnType<typeof setInterval> | null = null
+
+    const refreshUser = async (forceLogoutOnError: boolean) => {
+      try {
+        const user = await api.getCurrentUser()
+        if (!mounted) return
+        const token = localStorage.getItem('access_token')
+        const refresh = localStorage.getItem('refresh_token')
+        if (token && refresh) {
+          storeLogin(user, token, refresh)
+        }
+        const until = useAuthStore.getState().aggressive_refresh_until
+        if (until && Date.now() > until) stopAggressiveRefresh()
+      } catch {
+        if (forceLogoutOnError && mounted) storeLogout()
       }
-    }).catch(() => {
-      storeLogout()
+    }
+
+    const scheduleNext = () => {
+      if (interval) clearInterval(interval)
+      const aggressive = Date.now() < useAuthStore.getState().aggressive_refresh_until
+      const period = aggressive ? 3_000 : 60_000
+      interval = setInterval(() => {
+        refreshUser(false)
+        const stillAggressive = Date.now() < useAuthStore.getState().aggressive_refresh_until
+        if (stillAggressive !== aggressive) scheduleNext()
+      }, period)
+    }
+
+    // Kick off aggressive polling the moment Subscription.tsx sets the flag.
+    const unsubscribe = useAuthStore.subscribe((state, prev) => {
+      if (state.aggressive_refresh_until !== prev.aggressive_refresh_until) {
+        refreshUser(false)
+        scheduleNext()
+      }
     })
+
+    refreshUser(true)  // initial load — validate token
+    scheduleNext()
+
+    const onFocus = () => refreshUser(false)
+    window.addEventListener('focus', onFocus)
+
+    return () => {
+      mounted = false
+      if (interval) clearInterval(interval)
+      unsubscribe()
+      window.removeEventListener('focus', onFocus)
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

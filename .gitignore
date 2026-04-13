@@ -35,6 +35,10 @@ packages/local-engine/models/*.pt
 packages/local-engine/models/*.onnx
 
 # Build artifacts
+builds/
+packages/desktop/app-dist/
+packages/local-engine/imeet_audio_capture
+packages/local-engine/imeet_audio_capture.swift
 *.dmg
 *.exe
 *.AppImage

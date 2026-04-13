@@ -29,10 +29,12 @@ class PortalResponse(BaseModel):
 class LicenseActivateRequest(BaseModel):
     device_id: str
     device_name: str = ""
+    license_key: str | None = None  # Required only for standalone Lifetime app
 
 
 class LicenseVerifyRequest(BaseModel):
     device_id: str
+    license_key: str | None = None  # Required only for standalone Lifetime app
 
 
 class LicenseResponse(BaseModel):
@@ -41,6 +43,12 @@ class LicenseResponse(BaseModel):
     version: str | None = None
     activated_at: str | None = None
     reason: str | None = None
+    error: str | None = None
+    # Voxclar Cloud ASR API key and balance (returned to standalone Lifetime app)
+    api_key: str | None = None
+    asr_balance: int | None = None
+    email: str | None = None
+    username: str | None = None
 
 
 class TransactionResponse(BaseModel):

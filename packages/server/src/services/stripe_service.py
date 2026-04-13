@@ -248,7 +248,10 @@ async def handle_checkout_completed(db: AsyncSession, session: dict):
     elif plan == "lifetime":
         # Fetch the license key we just created
         lic_result = await db.execute(
-            select(License).where(License.user_id == user.id, License.is_active is True)
+            select(License).where(
+                License.user_id == user.id,
+                License.is_active == True,  # noqa: E712
+            )
         )
         lic = lic_result.scalar_one_or_none()
         asyncio.create_task(send_lifetime_email(
@@ -472,7 +475,7 @@ async def activate_license(
     result = await db.execute(
         select(License).where(
             License.user_id == uuid.UUID(user_id),
-            License.is_active is True,
+            License.is_active == True,  # noqa: E712
         )
     )
     license_record = result.scalar_one_or_none()
@@ -497,12 +500,121 @@ async def verify_license(db: AsyncSession, user_id: str, device_id: str) -> dict
     result = await db.execute(
         select(License).where(
             License.user_id == uuid.UUID(user_id),
-            License.is_active is True,
+            License.is_active == True,  # noqa: E712
         )
     )
     license_record = result.scalar_one_or_none()
     if not license_record:
         return {"valid": False, "reason": "no_license"}
+
+    if not license_record.device_id:
+        return {"valid": False, "reason": "not_activated"}
+
+    if license_record.device_id != device_id:
+        return {"valid": False, "reason": "wrong_device"}
+
+    return {
+        "valid": True,
+        "license_key": license_record.license_key,
+        "version": license_record.version_at_purchase,
+        "activated_at": license_record.activated_at.isoformat() if license_record.activated_at else None,
+    }
+
+
+async def activate_license_by_key(
+    db: AsyncSession, license_key: str, device_id: str, device_name: str = ""
+) -> tuple[License, User]:
+    """Activate a lifetime license using only the license key (no JWT required).
+
+    Used by the standalone Lifetime app where users enter their license key
+    from email without logging in. Also auto-generates the Voxclar Cloud ASR
+    API key on the user record if not already present.
+    """
+    result = await db.execute(
+        select(License).where(
+            License.license_key == license_key,
+            License.is_active == True,  # noqa: E712
+        )
+    )
+    license_record = result.scalar_one_or_none()
+    if not license_record:
+        raise NotFound("License key not found or inactive")
+
+    if license_record.device_id and license_record.device_id != device_id:
+        raise BadRequest(
+            "License already activated on another device. "
+            "Contact support to transfer."
+        )
+
+    # Load user and auto-generate Voxclar Cloud ASR API key if missing
+    user_result = await db.execute(
+        select(User).where(User.id == license_record.user_id)
+    )
+    user = user_result.scalar_one()
+    if not user.api_key:
+        user.api_key = f"vx-{secrets.token_hex(20)}"
+
+    license_record.device_id = device_id
+    license_record.device_name = device_name
+    license_record.activated_at = datetime.now(timezone.utc)
+    await db.flush()
+    return license_record, user
+
+
+async def create_asr_checkout_by_license(
+    db: AsyncSession, license_key: str
+) -> str:
+    """Create a Stripe Checkout session for ASR top-up, authenticated by license key.
+
+    Used by the standalone Lifetime app so Lifetime users can buy more
+    Voxclar Cloud ASR minutes without needing a JWT login.
+    """
+    if not settings.STRIPE_ASR_TOPUP_PRICE_ID:
+        raise BadRequest("ASR top-up price not configured")
+
+    # Find the user via the license key
+    lic_result = await db.execute(
+        select(License).where(
+            License.license_key == license_key,
+            License.is_active == True,  # noqa: E712
+        )
+    )
+    lic = lic_result.scalar_one_or_none()
+    if not lic:
+        raise NotFound("Invalid license key")
+
+    user_result = await db.execute(select(User).where(User.id == lic.user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise NotFound("User not found")
+
+    customer_id = await get_or_create_stripe_customer(db, user)
+    backend_url = settings.BACKEND_URL
+
+    session = stripe.checkout.Session.create(
+        customer=customer_id,
+        mode="payment",
+        line_items=[{"price": settings.STRIPE_ASR_TOPUP_PRICE_ID, "quantity": 1}],
+        success_url=f"{backend_url}/payment/result?success=true&topup=true",
+        cancel_url=f"{backend_url}/payment/result?cancelled=true",
+        metadata={"user_id": str(user.id), "plan": "asr_topup"},
+    )
+    return session.url
+
+
+async def verify_license_by_key(
+    db: AsyncSession, license_key: str, device_id: str
+) -> dict:
+    """Verify a license key + device binding (no JWT required)."""
+    result = await db.execute(
+        select(License).where(
+            License.license_key == license_key,
+            License.is_active == True,  # noqa: E712
+        )
+    )
+    license_record = result.scalar_one_or_none()
+    if not license_record:
+        return {"valid": False, "reason": "invalid_license_key"}
 
     if not license_record.device_id:
         return {"valid": False, "reason": "not_activated"}

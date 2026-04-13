@@ -18,12 +18,14 @@ class ServerASRStream:
     """WebSocket client that streams audio to the server's ASR proxy."""
 
     def __init__(self, ws_url: str, token: str, language: str = "en",
+                 stream_type: str = "system",
                  on_transcript: Callable | None = None, sample_rate: int = 16000,
                  on_question_detected: Callable | None = None,
                  on_answer_token: Callable | None = None):
         self.ws_url = ws_url
         self.token = token
         self.language = language
+        self.stream_type = stream_type
         self.on_transcript = on_transcript
         self.on_question_detected = on_question_detected
         self.on_answer_token = on_answer_token
@@ -40,7 +42,7 @@ class ServerASRStream:
         """Connect to server ASR proxy WebSocket."""
         try:
             # Add token as query param for WebSocket auth
-            url = f"{self.ws_url}?token={self.token}&language={self.language}"
+            url = f"{self.ws_url}?token={self.token}&language={self.language}&stream_type={self.stream_type}"
             self._ws = await websockets.connect(url, ping_interval=20, ping_timeout=10)
             self._connected = True
             self._loop = asyncio.get_running_loop()

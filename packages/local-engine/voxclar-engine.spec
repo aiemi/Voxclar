@@ -47,3 +47,14 @@ coll = COLLECT(
     upx_exclude=[],
     name='voxclar-engine',
 )
+
+# Post-build: bundle pre-compiled Swift helper next to voxclar-engine
+import shutil, os
+swift_helper_src = os.path.join(os.path.dirname(SPEC), 'imeet_audio_capture')
+swift_helper_dst = os.path.join(DISTPATH, 'voxclar-engine', 'imeet_audio_capture')
+if os.path.exists(swift_helper_src):
+    shutil.copy2(swift_helper_src, swift_helper_dst)
+    os.chmod(swift_helper_dst, 0o755)
+    print(f'[spec] Copied Swift helper: {swift_helper_dst}')
+else:
+    print(f'[spec] WARNING: Swift helper not found at {swift_helper_src}')

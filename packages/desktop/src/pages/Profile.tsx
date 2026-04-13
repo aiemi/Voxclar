@@ -42,8 +42,8 @@ function buildContext(data: Omit<ProfileData, 'context'>): string {
     parts.push('--- Resume Content ---')
     data.resumes.forEach((r) => {
       parts.push(`[${r.name}]`)
-      // 截取前 3000 字符，避免 context 过长
-      parts.push(r.content.slice(0, 3000))
+      // 完整内容传给 AI — 由服务器端 summarize 压缩，绝不在这里截断
+      parts.push(r.content)
     })
   }
   return parts.join('\n')
@@ -98,10 +98,11 @@ export default function Profile() {
 
     // 加入简历列表
     const newResumes = parsed.map((p) => ({ name: p.name, content: p.text, size: p.size }))
-    setResumes((prev) => [...prev, ...newResumes])
+    const mergedResumes = [...resumes, ...newResumes]
+    setResumes(mergedResumes)
 
-    // 2. 合并所有文件文本 → 一次性让 AI 综合理解 → 提取 profile
-    const allText = parsed.map((p) => `=== ${p.name} ===\n${p.text}`).join('\n\n')
+    // 2. 合并所有简历（旧的 + 新的）→ 一次性让 AI 综合理解 → 提取 profile
+    const allText = mergedResumes.map((r) => `=== ${r.name} ===\n${r.content}`).join('\n\n')
     if (allText) {
       const profile = await extractProfileFromText(allText)
       if (profile) {

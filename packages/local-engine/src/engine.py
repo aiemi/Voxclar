@@ -76,17 +76,19 @@ class MeetingEngine:
         asr_ws_url = self._server_api_url.replace("http", "ws") + "/asr/stream"
         logger.info(f"[ASR] ws_url={asr_ws_url}, token={'SET' if self._server_token else 'EMPTY'}")
         self._system_asr = ServerASRStream(
-            ws_url=asr_ws_url + "&stream_type=system",
+            ws_url=asr_ws_url,
             token=self._server_token,
             language=language,
+            stream_type="system",
             on_transcript=self._on_system_transcript,
             on_question_detected=self._on_server_question,
             on_answer_token=self._on_server_answer,
         )
         self._mic_asr = ServerASRStream(
-            ws_url=asr_ws_url + "&stream_type=mic",
+            ws_url=asr_ws_url,
             token=self._server_token,
             language=language,
+            stream_type="mic",
             on_transcript=self._on_mic_transcript,
         )
         logger.info("Using server ASR proxy")
