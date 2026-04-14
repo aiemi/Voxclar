@@ -21,7 +21,8 @@ class ServerASRStream:
                  stream_type: str = "system",
                  on_transcript: Callable | None = None, sample_rate: int = 16000,
                  on_question_detected: Callable | None = None,
-                 on_answer_token: Callable | None = None):
+                 on_answer_token: Callable | None = None,
+                 on_error: Callable | None = None):
         self.ws_url = ws_url
         self.token = token
         self.language = language
@@ -29,6 +30,7 @@ class ServerASRStream:
         self.on_transcript = on_transcript
         self.on_question_detected = on_question_detected
         self.on_answer_token = on_answer_token
+        self.on_error = on_error
         self.sample_rate = sample_rate
 
         self._ws = None
@@ -110,6 +112,9 @@ class ServerASRStream:
                         self.on_answer_token(data)
                     elif msg_type == "error":
                         logger.error(f"Server ASR error: {data.get('message', '')}")
+                        # Relay to engine → Electron so the user sees the message
+                        if self.on_error:
+                            self.on_error(data)
                 except json.JSONDecodeError as e:
                     logger.error(f"_receive_loop JSON decode error: {e}, raw={str(message)[:100]}")
         except websockets.ConnectionClosed as e:

@@ -57,8 +57,8 @@ async def transcribe_batch(
             raise HTTPException(status_code=401, detail="Invalid API key")
 
         # Check ASR balance (subscribed users use points_balance, lifetime uses asr_balance)
-        if user.subscription_tier == "lifetime" and user.asr_balance <= 0:
-            raise HTTPException(status_code=402, detail="Insufficient ASR minutes. Purchase more at voxclar.com")
+        if user.subscription_tier == "lifetime" and user.asr_balance < 0:
+            raise HTTPException(status_code=402, detail="Insufficient ASR minutes. Please top up to continue.")
         elif user.subscription_tier not in ("lifetime", "standard", "pro") and user.points_balance <= 0:
             raise HTTPException(status_code=402, detail="Insufficient minutes")
 
@@ -102,7 +102,7 @@ async def transcribe_batch(
         user_result = await db.execute(select(User).where(User.api_key == api_key))
         user = user_result.scalar_one()
         if user.subscription_tier == "lifetime":
-            user.asr_balance = max(0, user.asr_balance - minutes_used)
+            user.asr_balance = user.asr_balance - minutes_used  # can go negative (debt)
         else:
             user.points_balance = max(0, user.points_balance - minutes_used)
         await db.commit()
@@ -129,8 +129,8 @@ async def transcribe_stream(websocket: WebSocket):
             await websocket.close(code=4001, reason="Invalid API key")
             return
 
-        if user.subscription_tier == "lifetime" and user.asr_balance <= 0:
-            await websocket.close(code=4002, reason="Insufficient ASR minutes")
+        if user.subscription_tier == "lifetime" and user.asr_balance < 0:
+            await websocket.close(code=4002, reason="Insufficient ASR minutes. Please top up to continue.")
             return
 
     deepgram_key = settings.DEEPGRAM_API_KEY
@@ -168,51 +168,51 @@ async def transcribe_stream(websocket: WebSocket):
             user_id = user.id
             is_lifetime = user.subscription_tier == "lifetime"
 
-    # Deduct from asr_balance while streaming:
-    #   - First deduction at 30 s (>30 s counts as 1 min)
-    #   - Then every 60 s after that
-    #   - Also notify the client of the new balance so the UI updates live
-    # If balance hits 0 mid-session, close the connection gracefully.
-    async def deduct_minutes():
+    # Track streaming start time — deduction happens on disconnect,
+    # same pattern as subscriber meetings (meeting_service.end_meeting).
+    import time as _time
+    stream_start = _time.time()
+
+    # Watchdog: if user's balance would go beyond -10 min of debt,
+    # force-close the stream. Checks every 60 s.
+    MAX_DEBT_MINUTES = 10
+
+    async def overdraft_watchdog():
         if not is_lifetime or not user_id:
             return
-        await asyncio.sleep(30)  # first minute boundary at 30s
         while True:
+            await asyncio.sleep(60)
+            elapsed = _time.time() - stream_start
+            projected_usage = max(1, int(elapsed + 59) // 60)
             try:
                 async with async_session_factory() as db:
                     u = (await db.execute(
                         select(User).where(User.id == user_id)
                     )).scalar_one()
-                    if u.asr_balance <= 0:
-                        logger.info(f"ASR balance exhausted for user {user_id}, closing stream")
+                    projected_balance = u.asr_balance - projected_usage
+                    if projected_balance < -MAX_DEBT_MINUTES:
+                        logger.info(
+                            f"ASR overdraft limit reached: user={user_id}, "
+                            f"balance={u.asr_balance}, projected_debt={-projected_balance}min"
+                        )
                         try:
                             await websocket.send_text(json.dumps({
-                                "type": "asr_balance", "balance": 0,
+                                "type": "error",
+                                "message": "Usage has exceeded your available minutes. Please top up as soon as possible to restore service.",
                             }))
-                            await websocket.close(code=4002, reason="ASR minutes exhausted")
+                            await websocket.close(code=4002, reason="ASR overdraft limit reached")
                         except Exception:
                             pass
                         return
-                    u.asr_balance = max(0, u.asr_balance - 1)
-                    await db.commit()
-                    remaining = u.asr_balance
-                    logger.info(f"ASR deducted 1 min for user {user_id}, remaining={remaining}")
-                try:
-                    await websocket.send_text(json.dumps({
-                        "type": "asr_balance", "balance": remaining,
-                    }))
-                except Exception:
-                    pass
             except Exception:
                 return
-            await asyncio.sleep(60)  # subsequent deductions every 60s
 
     try:
         async with websockets.connect(
             dg_url,
             additional_headers={"Authorization": f"Token {deepgram_key}"},
         ) as dg_ws:
-            deduct_task = asyncio.create_task(deduct_minutes())
+            watchdog_task = asyncio.create_task(overdraft_watchdog())
 
             # Forward: client audio → Deepgram
             async def forward_audio():
@@ -232,7 +232,7 @@ async def transcribe_stream(websocket: WebSocket):
                     pass
 
             await asyncio.gather(forward_audio(), forward_results())
-            deduct_task.cancel()
+            watchdog_task.cancel()
 
     except Exception as e:
         logger.error(f"Cloud ASR stream failed: {e}")
@@ -240,3 +240,29 @@ async def transcribe_stream(websocket: WebSocket):
             await websocket.close(code=4500, reason=str(e)[:120])
         except Exception:
             pass
+    finally:
+        # Deduct on disconnect — same logic as subscriber meetings:
+        # ceil(duration) in minutes, minimum 1 minute.
+        if is_lifetime and user_id:
+            duration = _time.time() - stream_start
+            minutes_used = max(1, int(duration + 59) // 60)
+            try:
+                async with async_session_factory() as db:
+                    u = (await db.execute(
+                        select(User).where(User.id == user_id)
+                    )).scalar_one()
+                    u.asr_balance = u.asr_balance - minutes_used  # can go negative (debt)
+                    await db.commit()
+                    logger.info(
+                        f"ASR stream ended: user={user_id}, duration={int(duration)}s, "
+                        f"deducted={minutes_used}min, remaining={u.asr_balance}min"
+                    )
+                    # Push final balance to client (if still connected)
+                    try:
+                        await websocket.send_text(json.dumps({
+                            "type": "asr_balance", "balance": u.asr_balance,
+                        }))
+                    except Exception:
+                        pass
+            except Exception as e:
+                logger.error(f"ASR deduction failed: {e}")

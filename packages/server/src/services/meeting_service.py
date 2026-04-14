@@ -24,8 +24,9 @@ async def create_meeting(
     if not user:
         raise NotFound("User not found")
     if user.subscription_tier == "lifetime":
-        pass  # Lifetime users have no limits
-    elif user.points_balance < 1 and user.topup_balance < 1 and user.subscription_tier == "free":
+        pass  # Lifetime users have no limits on meetings (Cloud ASR checked separately)
+    elif (user.points_balance + user.topup_balance) < 0:
+        # Negative total = debt from a previous overrun; must top up first
         raise InsufficientPoints()
 
     meeting = Meeting(
@@ -98,13 +99,12 @@ async def end_meeting(db: AsyncSession, meeting_id: str, user_id: str) -> Meetin
         if user.subscription_tier != "lifetime":
             remaining = minutes_used
             # First deduct from subscription balance
-            sub_deduct = min(user.points_balance, remaining)
+            sub_deduct = min(max(0, user.points_balance), remaining)
             user.points_balance -= sub_deduct
             remaining -= sub_deduct
-            # Then deduct from top-up balance
+            # Then deduct from top-up balance (can go negative = debt)
             if remaining > 0:
-                topup_deduct = min(user.topup_balance, remaining)
-                user.topup_balance -= topup_deduct
+                user.topup_balance -= remaining
 
             db.add(Transaction(
                 user_id=uuid.UUID(user_id),

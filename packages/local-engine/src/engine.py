@@ -83,6 +83,7 @@ class MeetingEngine:
             on_transcript=self._on_system_transcript,
             on_question_detected=self._on_server_question,
             on_answer_token=self._on_server_answer,
+            on_error=lambda data: self.on_error(data) if self.on_error else None,
         )
         self._mic_asr = ServerASRStream(
             ws_url=asr_ws_url,

@@ -2,14 +2,19 @@
 import json
 import logging
 import asyncio
+import time as _time
 
 from fastapi import WebSocket
+from sqlalchemy import select
 import websockets
 
 from src.config import get_settings
+from src.models.user import User
 from src.services.meeting_session import get_session
 
 logger = logging.getLogger(__name__)
+
+MAX_DEBT_MINUTES = 10  # Force-close if projected debt exceeds this
 
 DEEPGRAM_WS_URL = "wss://api.deepgram.com/v1/listen"
 
@@ -58,6 +63,48 @@ async def proxy_asr_stream(websocket: WebSocket, language: str = "en",
         return
 
     logger.info(f"ASR proxy started: language={language}, user={user_id}, type={stream_type}")
+
+    stream_start = _time.time()
+
+    # Watchdog: force-close if user's projected debt exceeds MAX_DEBT_MINUTES
+    async def overdraft_watchdog():
+        if not user_id:
+            return
+        while True:
+            await asyncio.sleep(60)
+            elapsed = _time.time() - stream_start
+            projected_usage = max(1, int(elapsed + 59) // 60)
+            try:
+                from src.dependencies import _ensure_async_session_factory
+                sf = _ensure_async_session_factory()
+                async with sf() as db:
+                    u = (await db.execute(
+                        select(User).where(User.id == __import__('uuid').UUID(user_id))
+                    )).scalar_one_or_none()
+                    if not u:
+                        return
+                    total_balance = u.points_balance + u.topup_balance
+                    if u.subscription_tier == "lifetime":
+                        return  # Lifetime uses /v1/listen/stream, not this proxy
+                    projected_balance = total_balance - projected_usage
+                    if projected_balance < -MAX_DEBT_MINUTES:
+                        logger.info(
+                            f"Subscriber overdraft limit: user={user_id}, "
+                            f"balance={total_balance}, projected_debt={-projected_balance}min"
+                        )
+                        try:
+                            await websocket.send_json({
+                                "type": "error",
+                                "message": "Usage has exceeded your available minutes. Please upgrade or purchase a Time Boost to restore service.",
+                            })
+                            await websocket.close()
+                        except Exception:
+                            pass
+                        return
+            except Exception:
+                return
+
+    watchdog_task = asyncio.create_task(overdraft_watchdog())
 
     # Set session callback so question detection + answers are sent via this WebSocket
     if stream_type == "system" and user_id:
@@ -126,6 +173,7 @@ async def proxy_asr_stream(websocket: WebSocket, language: str = "en",
         pass
     finally:
         relay_task.cancel()
+        watchdog_task.cancel()
         try:
             await dg_ws.close()
         except Exception:
