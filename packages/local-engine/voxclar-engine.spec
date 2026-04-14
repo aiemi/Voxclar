@@ -3,8 +3,27 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = []
 binaries = []
-hiddenimports = ['pyaudiowpatch', 'sounddevice', 'scipy.signal', 'websockets', 'websockets.asyncio', 'websockets.asyncio.client', 'websockets.asyncio.server', 'websockets.legacy.server', 'numpy']
+hiddenimports = [
+    # External
+    'pyaudiowpatch', 'sounddevice', 'scipy.signal', 'websockets',
+    'websockets.asyncio', 'websockets.asyncio.client', 'websockets.asyncio.server',
+    'websockets.legacy.server', 'numpy', 'httpx', 'pydantic',
+    # Internal — Cython .so modules (PyInstaller can't trace imports inside .so)
+    'src.server', 'src.engine',
+    'src.asr', 'src.asr.server_asr_stream',
+    'src.audio', 'src.audio.capture_manager', 'src.audio.echo_canceller',
+    'src.audio.macos_capture', 'src.audio.mic_capture', 'src.audio.noise_reducer',
+    'src.audio.vad', 'src.audio.windows_capture',
+    'src.utils', 'src.utils.audio_utils', 'src.utils.ring_buffer',
+    # Stdlib used inside .so modules
+    'asyncio', 'json', 'logging', 'os', 'platform', 'subprocess', 'tempfile',
+    'threading', 'time', 'struct', 'difflib',
+]
 
+# Collect Cython .so files as binaries so PyInstaller bundles them
+import glob as _glob
+for _so in _glob.glob('src/**/*.so', recursive=True):
+    binaries.append((_so, os.path.dirname(_so)))
 
 a = Analysis(
     ['run_engine.py'],

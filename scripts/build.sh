@@ -8,6 +8,10 @@
 #   ./scripts/build.sh --no-protect # skip code protection
 #   ./scripts/build.sh --clean      # clean all build artifacts first
 #
+# Protection stack (free, no licenses needed):
+#   Python: Cython → compiles .py to native .so (machine code)
+#   JS:     javascript-obfuscator → control-flow + string encryption
+#
 # Environment:
 #   VOXCLAR_PROTECT=0  — same as --no-protect
 # ─────────────────────────────────────────────────────────────────
@@ -60,7 +64,10 @@ cd "$PROJECT_ROOT"
 # ── Step 0: Clean ───────────────────────────────────────────────
 if [[ $CLEAN -eq 1 ]]; then
   echo "🧹 Cleaning..."
-  rm -rf "$ENGINE_DIR/build" "$ENGINE_DIR/dist" "$ENGINE_DIR/__pyarmor_obf"
+  rm -rf "$ENGINE_DIR/build" "$ENGINE_DIR/dist"
+  find "$ENGINE_DIR/src" -name "*.so" -delete
+  find "$ENGINE_DIR/src" -name "*.c" -delete
+  find "$ENGINE_DIR/src" -name "*.py.bak" -delete
   rm -rf "$DESKTOP_DIR/dist" "$DESKTOP_DIR/dist-electron" "$DESKTOP_DIR/app-dist"
   rm -rf "$BUILDS_DIR"
 fi
@@ -85,26 +92,62 @@ elif [[ -f "$SWIFT_HELPER" ]]; then
   echo "✓ Swift helper already exists"
 fi
 
-# ── Step 2: Python Code Protection (PyArmor) ───────────────────
-PYINSTALLER_SRC="$ENGINE_DIR"
+# ── Step 2: Python Code Protection (Cython → native .so) ───────
+# Skip list: files that should remain as .py
+#   __init__.py      — usually empty, needed as-is for Python packages
+#   macos_capture.py — contains embedded Swift source code string
+#   windows_capture.py — platform-specific, keep readable
+CYTHON_SKIP="__init__.py|macos_capture.py|windows_capture.py"
+
 if [[ $PROTECT -eq 1 ]]; then
-  echo "🔒 Obfuscating Python code with PyArmor..."
-  OBF_DIR="$ENGINE_DIR/__pyarmor_obf"
-  rm -rf "$OBF_DIR"
-  mkdir -p "$OBF_DIR"
+  echo "🔒 Compiling Python → native .so with Cython..."
+  cd "$ENGINE_DIR"
 
-  # Copy source for obfuscation
-  cp -R "$ENGINE_DIR/src" "$OBF_DIR/src"
-  [[ -f "$ENGINE_DIR/run_engine.py" ]] && cp "$ENGINE_DIR/run_engine.py" "$OBF_DIR/"
+  # Generate setup.py for batch cythonize
+  python3 - << 'CYEOF'
+import os, sys
+from Cython.Build import cythonize
+from setuptools import setup, Extension
 
-  # Obfuscate
-  pyarmor gen \
-    --output "$OBF_DIR" \
-    --recursive \
-    "$OBF_DIR/src/" 2>&1 | tail -5
+SKIP = {'__init__.py', 'macos_capture.py', 'windows_capture.py'}
+extensions = []
+for root, dirs, files in os.walk('src'):
+    for f in files:
+        if f.endswith('.py') and f not in SKIP:
+            full = os.path.join(root, f)
+            mod = full.replace('/', '.').replace('.py', '')
+            extensions.append(Extension(mod, [full]))
 
-  PYINSTALLER_SRC="$OBF_DIR"
-  echo "   ✓ Python obfuscated"
+if not extensions:
+    print("No files to compile"); sys.exit(0)
+
+print(f"Compiling {len(extensions)} Python modules to native code...")
+for e in extensions:
+    print(f"  → {e.name}")
+
+setup(
+    ext_modules=cythonize(extensions, compiler_directives={'language_level': '3'}),
+    script_args=['build_ext', '--inplace'],
+)
+CYEOF
+
+  # Backup .py, delete originals (keep .so), so PyInstaller bundles .so not .pyc
+  COMPILED=0
+  for so in $(find src -name "*.cpython-*.so" 2>/dev/null); do
+    # Extract the .py path from the .so filename
+    py=$(echo "$so" | sed 's/.cpython-[0-9]*-darwin.so/.py/' | sed 's/.cpython-[0-9]*-[a-z]*-[a-z_]*-[a-z]*.so/.py/')
+    if [[ -f "$py" ]]; then
+      cp "$py" "${py}.bak"
+      rm "$py"
+      COMPILED=$((COMPILED + 1))
+    fi
+  done
+
+  # Clean intermediate .c files
+  find src -name "*.c" -delete
+  rm -rf build/
+
+  echo "   ✓ $COMPILED modules compiled to native .so"
 else
   echo "⏭️  Skipping Python protection"
 fi
@@ -115,6 +158,15 @@ cd "$ENGINE_DIR"
 rm -rf build/ dist/
 pyinstaller voxclar-engine.spec --clean 2>&1 | tail -5
 echo "   ✓ Engine built ($(du -sh dist/voxclar-engine/ | awk '{print $1}'))"
+
+# Restore .py from backups (so git stays clean)
+if [[ $PROTECT -eq 1 ]]; then
+  for bak in $(find src -name "*.py.bak" 2>/dev/null); do
+    mv "$bak" "${bak%.bak}"
+  done
+  find src -name "*.so" -delete
+  echo "   ✓ Source restored"
+fi
 
 # ── Step 4: Copy Engine → Desktop ──────────────────────────────
 echo "📋 Copying engine to desktop build..."
@@ -132,7 +184,6 @@ echo "   ✓ Web bundle ready"
 # ── Step 6: JS Code Protection ──────────────────────────────────
 if [[ $PROTECT -eq 1 ]]; then
   echo "🔒 Obfuscating JavaScript..."
-  # Find the main JS bundle(s) in app-dist/assets/
   for jsfile in "$DESKTOP_DIR/app-dist/assets/"*.js; do
     [[ -f "$jsfile" ]] || continue
     SIZE_BEFORE=$(wc -c < "$jsfile")
@@ -193,9 +244,6 @@ if [[ $IS_LIFETIME -eq 0 && -n "$APP_DIR" ]]; then
   ditto "$APP_DIR" "/Applications/$APP_NAME"
   echo "   ✓ Installed to /Applications/$APP_NAME"
 fi
-
-# ── Cleanup ─────────────────────────────────────────────────────
-rm -rf "$ENGINE_DIR/__pyarmor_obf"
 
 echo ""
 echo "╔═══════════════════════════════════════════════════════╗"
