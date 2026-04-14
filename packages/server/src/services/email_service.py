@@ -207,18 +207,25 @@ async def send_subscription_email(email: str, username: str, plan: str, minutes:
 # ── Lifetime license ────────────────────────────────────────────
 
 async def send_lifetime_email(email: str, username: str, license_key: str):
+    download_url = f"{WEBSITE_URL}/api/v1/download/redirect?version=lifetime"
     body = (
         _heading("Lifetime License Activated!")
         + _text(f"Hi {username}, congratulations! Your lifetime license is now active. You have unlimited access to Voxclar — forever.")
         + _info_table([
             ("License Key", f'<code style="color:#ffdd02;background:#2a2500;padding:2px 8px;border-radius:4px;">{license_key}</code>'),
             ("Plan", "Lifetime — Unlimited"),
-            ("ASR", "Voxclar Cloud ASR — Unlimited"),
-            ("AI Models", "All models included"),
+            ("Cloud ASR", "Voxclar Cloud ASR included"),
+            ("AI Models", "All models — bring your own OpenAI / Claude key"),
         ])
-        + _text("Your license is device-locked. Set up your AI API keys in Settings to start using AI-powered answers.")
-        + _button(WEBSITE_URL, "Open Voxclar")
+        + _text("Your license is device-locked to one computer. Paste the license key above when you first open the app.")
+        + _button(download_url, "Download Voxclar Lifetime")
         + _divider()
+        + _text(
+            '<span style="font-size:12px;color:#999999;">'
+            'The download link auto-detects your system (Apple Silicon / Intel Mac / Windows). '
+            'Voxclar is a desktop application — please open this email on your computer.'
+            '</span>'
+        )
         + _text('<span style="font-size:12px;color:#777777;">Save this email — your license key is shown above. You can also view it in the app.</span>')
         + _discord_block()
     )
