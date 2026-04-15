@@ -39,12 +39,18 @@ DOWNLOADS = {
 }
 
 
-def detect_platform(user_agent: str) -> str:
-    """Detect platform from User-Agent string.
+def detect_platform(user_agent: str, sec_ch_ua_arch: str = "") -> str:
+    """Detect platform from User-Agent + Client Hints.
 
     Returns: 'mac-arm64' | 'mac-x64' | 'windows' | 'unsupported'
+
+    IMPORTANT: Chrome on Apple Silicon reports "Intel Mac OS X" in its UA
+    string for compatibility. The only reliable way to distinguish is via
+    the Sec-CH-UA-Arch client hint header. When unavailable we default to
+    arm64 since the vast majority of new Macs are Apple Silicon.
     """
     ua = user_agent.lower()
+    arch_hint = sec_ch_ua_arch.strip('" ').lower()
 
     # Mobile / tablet → unsupported
     if any(m in ua for m in ("iphone", "ipad", "android", "mobile")):
@@ -54,21 +60,25 @@ def detect_platform(user_agent: str) -> str:
     if "windows" in ua:
         return "windows"
 
-    # macOS — distinguish Intel vs Apple Silicon
+    # macOS
     if "macintosh" in ua or "mac os" in ua:
-        # Safari and Chrome on Apple Silicon include "ARM64" or run natively
-        # Chrome: "Macintosh; ARM64" or via Sec-CH-UA-Arch
-        # Most reliable: check for ARM indicators
+        # Best signal: Sec-CH-UA-Arch client hint (Chrome 93+)
+        if arch_hint:
+            if arch_hint in ("arm", "arm64"):
+                return "mac-arm64"
+            if arch_hint in ("x86", "x86_64", "x64"):
+                return "mac-x64"
+
+        # Fallback: Safari on Apple Silicon says "ARM64" in UA
         if "arm64" in ua or "aarch64" in ua:
             return "mac-arm64"
-        # Intel Macs show "Intel" in UA
-        if "intel" in ua:
-            return "mac-x64"
-        # Ambiguous (some browsers don't specify) — default to arm64
-        # since most new Macs are Apple Silicon
+
+        # Chrome on Apple Silicon still says "Intel" — can't distinguish
+        # from real Intel Macs via UA alone. Default to arm64 since most
+        # Macs sold since late 2020 are Apple Silicon.
         return "mac-arm64"
 
-    # Linux → unsupported (we don't have Linux builds)
+    # Linux → unsupported
     if "linux" in ua:
         return "unsupported"
 
@@ -91,7 +101,8 @@ async def smart_download(
       platform — optional override (skip auto-detection)
     """
     ua = request.headers.get("user-agent", "")
-    detected = platform if platform in ("mac-arm64", "mac-x64", "windows") else detect_platform(ua)
+    arch_hint = request.headers.get("sec-ch-ua-arch", "")
+    detected = platform if platform in ("mac-arm64", "mac-x64", "windows") else detect_platform(ua, arch_hint)
 
     version_key = "lifetime" if "lifetime" in version.lower() else "cloud"
     urls = DOWNLOADS.get(version_key, DOWNLOADS["cloud"])
@@ -130,7 +141,8 @@ async def download_redirect(
       <a href="https://voxclar.com/api/v1/download/redirect?version=cloud">
     """
     ua = request.headers.get("user-agent", "")
-    detected = platform if platform in ("mac-arm64", "mac-x64", "windows") else detect_platform(ua)
+    arch_hint = request.headers.get("sec-ch-ua-arch", "")
+    detected = platform if platform in ("mac-arm64", "mac-x64", "windows") else detect_platform(ua, arch_hint)
 
     version_key = "lifetime" if "lifetime" in version.lower() else "cloud"
     urls = DOWNLOADS.get(version_key, DOWNLOADS["cloud"])

@@ -26,13 +26,20 @@ BUILDS_DIR="$PROJECT_ROOT/builds"
 # ── Defaults ────────────────────────────────────────────────────
 ARCH="$(uname -m)"                       # arm64 or x86_64
 PROTECT="${VOXCLAR_PROTECT:-1}"          # 1=obfuscate, 0=skip
+SIGN="${VOXCLAR_SIGN:-1}"               # 1=sign+notarize, 0=skip
 CLEAN=0
+
+# Apple Developer credentials for code signing + notarization
+export APPLE_ID="${APPLE_ID:-aimei2036@gmail.com}"
+export APPLE_ID_PASSWORD="${APPLE_ID_PASSWORD:-espi-kqfk-gzla-zoaa}"
+export APPLE_TEAM_ID="${APPLE_TEAM_ID:-9N7J9PP9VQ}"
 
 # ── Parse args ──────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --arch)      ARCH="$2"; shift 2 ;;
     --no-protect) PROTECT=0; shift ;;
+    --no-sign)   SIGN=0; shift ;;
     --clean)     CLEAN=1; shift ;;
     *)           echo "Unknown arg: $1"; exit 1 ;;
   esac
@@ -56,7 +63,7 @@ IS_LIFETIME=0
 
 echo "╔═══════════════════════════════════════════════════════╗"
 echo "║  Voxclar Build — $PRODUCT_NAME"
-echo "║  Arch: $ARCH_LABEL  |  Protect: $PROTECT  |  Clean: $CLEAN"
+echo "║  Arch: $ARCH_LABEL  |  Protect: $PROTECT  |  Sign: $SIGN  |  Clean: $CLEAN"
 echo "╚═══════════════════════════════════════════════════════╝"
 
 cd "$PROJECT_ROOT"
@@ -209,12 +216,24 @@ fi
 # ── Step 7: Package with electron-builder ───────────────────────
 echo "📱 Packaging app with electron-builder..."
 rm -rf dist/
-npx electron-builder \
-  --mac \
-  --$EB_ARCH \
-  --config.mac.identity=null \
-  --config.mac.notarize=false \
-  2>&1 | tail -5
+
+if [[ $SIGN -eq 1 ]]; then
+  echo "   🔏 Signing with Developer ID: $APPLE_TEAM_ID"
+  # Let electron-builder auto-discover the certificate from Keychain
+  unset CSC_LINK 2>/dev/null || true
+  export CSC_IDENTITY_AUTO_DISCOVERY=true
+  npx electron-builder \
+    --mac \
+    --$EB_ARCH \
+    2>&1 | tail -10
+else
+  npx electron-builder \
+    --mac \
+    --$EB_ARCH \
+    --config.mac.identity=null \
+    --config.mac.notarize=false \
+    2>&1 | tail -5
+fi
 echo "   ✓ Packaged"
 
 # ── Step 8: Copy to Builds ─────────────────────────────────────
