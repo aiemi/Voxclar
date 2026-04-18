@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Save, Plus, X, Upload, User, Briefcase, FileText, CheckCircle, File } from 'lucide-react'
 import { saveProfileLocal } from '@/services/storage'
@@ -74,6 +74,31 @@ export default function Profile() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [extracting, setExtracting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Sync from server on mount — if local is empty but server has data
+  // (e.g. user logged in on a new computer), populate from server.
+  useEffect(() => {
+    if (name || headline || summary || skills.length) return // local already has data
+    import('@/services/api').then(({ api }) => {
+      api.getProfile().then((profile) => {
+        if (profile.full_name) setName(profile.full_name)
+        if (profile.headline) setHeadline(profile.headline)
+        if (profile.summary) setSummary(profile.summary)
+        if (profile.skills?.length) setSkills(profile.skills)
+        // Save to local so subsequent loads don't hit the server again
+        if (profile.full_name || profile.headline || profile.summary || profile.skills?.length) {
+          saveProfileLocal({
+            name: profile.full_name || '',
+            headline: profile.headline || '',
+            summary: profile.summary || '',
+            skills: profile.skills || [],
+            resumes: [],  // resumes are local-only (file content too large for server)
+            context: '',
+          })
+        }
+      }).catch(() => {}) // silently fail if offline
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const addSkill = () => {
     if (newSkill.trim() && !skills.includes(newSkill.trim())) {
